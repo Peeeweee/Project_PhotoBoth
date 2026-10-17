@@ -1,0 +1,28 @@
+name: Application checks
+on:
+  push:
+  pull_request:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            photodate-client/package-lock.json
+            photodate-server/package-lock.json
+      - run: npm ci
+        working-directory: photodate-server
+      - run: npm run build
+        working-directory: photodate-server
+      - run: npm test
+        working-directory: photodate-server
+      - run: npm ci
+        working-directory: photodate-client
+      - run: npm run lint
+        working-directory: photodate-client
+      - run: npm run build
+        working-directory: photodate-client

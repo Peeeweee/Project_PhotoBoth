@@ -1,0 +1,231 @@
+/* ── Google Fonts ─────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+/* ── Keyframe animations ───────────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { transform: scale(1);   opacity: 0.3; }
+  50%       { transform: scale(1.8); opacity: 0;   }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Design Tokens ────────────────────────────────────────── */
+:root {
+  /* ---- Color: Neutral scale (dark-first) ---- */
+  --c-bg:          #0a0a0f;   /* page background      */
+  --c-surface-1:   #111118;   /* card / panel         */
+  --c-surface-2:   #18181f;   /* raised element       */
+  --c-surface-3:   #222230;   /* hover / active state */
+  --c-border:      #2a2a38;   /* subtle divider       */
+  --c-border-soft: #1e1e28;   /* very subtle          */
+
+  /* ---- Color: Text ---- */
+  --c-text-hi:     #f0eeff;   /* primary labels       */
+  --c-text-md:     #9d9bb8;   /* secondary / body     */
+  --c-text-lo:     #55536e;   /* muted / placeholder  */
+
+  /* ---- Color: Accent (rose-pink) ---- */
+  --c-accent:      #e0427c;
+  --c-accent-dim:  #a82d5a;
+  --c-accent-glow: rgba(224, 66, 124, 0.22);
+  --c-accent-soft: rgba(224, 66, 124, 0.10);
+  --c-accent-border: rgba(224, 66, 124, 0.35);
+
+  /* ---- Color: Status ---- */
+  --c-success:     #34d399;
+  --c-warning:     #fbbf24;
+  --c-error:       #f87171;
+
+  /* ---- Spacing scale (4 px base) ---- */
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+  --sp-20: 80px;
+
+  /* ---- Typography ---- */
+  --font-ui:   'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  --text-xs:   0.6875rem;   /* 11px */
+  --text-sm:   0.8125rem;   /* 13px */
+  --text-base: 0.9375rem;   /* 15px */
+  --text-md:   1rem;        /* 16px */
+  --text-lg:   1.125rem;    /* 18px */
+  --text-xl:   1.25rem;     /* 20px */
+  --text-2xl:  1.5rem;      /* 24px */
+  --text-3xl:  2rem;        /* 32px */
+  --text-4xl:  2.5rem;      /* 40px */
+
+  --lh-tight:  1.2;
+  --lh-base:   1.5;
+  --lh-relaxed:1.7;
+
+  /* ---- Border radius ---- */
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  16px;
+  --r-xl:  24px;
+  --r-full: 9999px;
+
+  /* ---- Shadows ---- */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.5);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.55);
+  --shadow-lg:  0 8px 40px rgba(0,0,0,0.65);
+  --shadow-accent: 0 0 24px var(--c-accent-glow);
+
+  /* ---- Motion ---- */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-expo:  cubic-bezier(0.7,  0, 0.84, 0);
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-slow: 400ms;
+
+  /* ---- Topbar ---- */
+  --topbar-h: 56px;
+}
+
+/* ── Reset ────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  height: 100%;
+  font-size: 16px;
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  height: 100%;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+  color: var(--c-text-md);
+  background: var(--c-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Typography helpers ───────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-ui);
+  color: var(--c-text-hi);
+  line-height: var(--lh-tight);
+  font-weight: 600;
+}
+
+code, kbd, .mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+/* ── Interactive baseline ─────────────────────────────────── */
+button, [role="button"] {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: inherit;
+}
+
+a {
+  color: var(--c-accent);
+  text-decoration: none;
+}
+
+img, video {
+  display: block;
+  max-width: 100%;
+}
+
+/* ── Scrollbar (webkit) ───────────────────────────────────── */
+::-webkit-scrollbar            { width: 6px; height: 6px; }
+::-webkit-scrollbar-track      { background: var(--c-surface-1); }
+::-webkit-scrollbar-thumb      { background: var(--c-border); border-radius: var(--r-full); }
+::-webkit-scrollbar-thumb:hover{ background: var(--c-surface-3); }
+
+/* ── Focus ring ───────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 3px;
+}
+
+/* ── Theme skins ──────────────────────────────────────────── */
+
+/*
+ * Each theme may add a body class that injects atmospheric effects:
+ * grain overlay, gradient glows, etc. — on top of the CSS var overrides.
+ */
+
+/* -- Vintage grain layer ---------------------------------------- */
+body.theme-vintage::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.055;
+  /* SVG noise pattern */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  mix-blend-mode: overlay;
+}
+
+/* Warm sepia vignette for vintage */
+body.theme-vintage::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9997;
+  background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, rgba(10, 5, 0, 0.45) 100%);
+}
+
+/* -- Meme electric glow ----------------------------------------- */
+body.theme-meme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9997;
+  background:
+    radial-gradient(ellipse 60% 30% at 20% 10%, rgba(255, 48, 96, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 25% at 80% 80%, rgba(120, 80, 255, 0.06) 0%, transparent 60%);
+}
+
+
+/* Keyboard and small-screen workflow support */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--c-accent);
+  outline-offset: 4px;
+}
+button { -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+input, select, textarea { max-width: 100%; }
+@media (max-width: 640px) {
+  .page-container { padding-left: 16px; padding-right: 16px; }
+  input, textarea, select { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
