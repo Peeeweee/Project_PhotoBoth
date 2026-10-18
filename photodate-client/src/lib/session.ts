@@ -2,9 +2,9 @@ import { leaveRoom } from "./api";
 import { socket } from "./socket";
 import { useRoomStore } from "../state/useRoomStore";
 import { useSessionStore } from "../state/useSessionStore";
-export function leaveSession() {
+export function leaveSession(skipRemote = false) {
   const { roomCode, selfId } = useRoomStore.getState();
-  if (roomCode && selfId)
+  if (!skipRemote && roomCode && selfId)
     void leaveRoom(roomCode).catch(() => {
       /* Server disconnect grace policy revokes abandoned membership. */
     });
@@ -16,10 +16,13 @@ export function publishStage(stage: string, onSuccess?: () => void) {
   const room = useRoomStore.getState();
   if (!room.isHost || !room.roomCode) return;
   const {
+    customLayout,
     assignedPhotos,
     placedStickers,
     drawStrokes,
     stripTitle,
+    textLayers,
+    titleStyle,
     titlePosition,
     filterId,
     showWatermark,
@@ -32,10 +35,13 @@ export function publishStage(stage: string, onSuccess?: () => void) {
       code: room.roomCode,
       stage,
       editor: {
+        customLayout,
         assignedPhotos,
         placedStickers,
         drawStrokes,
         stripTitle,
+        textLayers,
+        titleStyle,
         titlePosition,
         filterId,
         showWatermark,
