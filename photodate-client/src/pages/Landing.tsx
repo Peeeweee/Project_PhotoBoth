@@ -244,6 +244,7 @@ export default function Landing() {
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(false);
   const [errorCreate, setErrorCreate] = useState<string | null>(null);
+  const [fullRoom, setFullRoom] = useState(false);
   const [errorJoin, setErrorJoin] = useState<string | null>(null);
 
   // Auto-select Classic if nothing chosen
@@ -334,10 +335,12 @@ export default function Landing() {
     } catch (e) {
       const msg = (e as Error).message;
       if (msg.includes("not found") || msg.includes("404")) {
+        setFullRoom(false);
         setErrorJoin("Room not found. Please double-check the code.");
       } else if (msg.includes("full")) {
-        setErrorJoin("This room is already full!");
+        setFullRoom(true);
       } else {
+        setFullRoom(false);
         setErrorJoin(msg);
       }
     } finally {
@@ -345,6 +348,47 @@ export default function Landing() {
       setLoadingJoin(false);
     }
   };
+
+  if (fullRoom)
+    return (
+      <section className="full-room studio-page">
+        <span className="studio-eyebrow">THE CREW IS COMPLETE</span>
+        <h1>This lobby is full.</h1>
+        <p>
+          Room <strong>{joinCode}</strong> already has all four spots taken. Ask
+          the host to let you know when a spot opens, or create a new lobby for
+          your own crew.
+        </p>
+        <p>Your name and code are saved here while you wait.</p>
+        <div className="leave-actions">
+          <button
+            disabled={loadingJoin}
+            onClick={() => {
+              void handleJoin();
+            }}
+          >
+            {loadingJoin ? "Checking…" : "Try joining again"}
+          </button>
+          <button
+            className="action-primary"
+            onClick={() => {
+              setHostName(guestName);
+              setFullRoom(false);
+              setErrorJoin(null);
+              requestAnimationFrame(() => {
+                document
+                  .getElementById("host-name-input")
+                  ?.scrollIntoView({ block: "center" });
+                document.getElementById("host-name-input")?.focus();
+              });
+            }}
+          >
+            Create a new lobby
+          </button>
+          <button onClick={() => setFullRoom(false)}>Change code</button>
+        </div>
+      </section>
+    );
 
   return (
     <div
