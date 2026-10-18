@@ -126,6 +126,10 @@ export default function EditorRoom() {
     // Transition the room state to 'editing'.
     if (isHost && roomCode && selfId) {
       setGlobalAssignedPhotos(assignedPhotos as string[]);
+      if (["editing", "exporting"].includes(useRoomStore.getState().status)) {
+        publishStage("filter", () => navigate("/filter"));
+        return;
+      }
       socket.emit(
         "update-room-state",
         {
