@@ -5,9 +5,11 @@ import { motion } from "framer-motion";
 export default function LiveSlot({
   stream,
   count,
+  mirrored,
 }: {
   stream: MediaStream;
   count: number | null;
+  mirrored?: boolean;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -20,7 +22,7 @@ export default function LiveSlot({
     };
   }, [stream]);
   const front =
-    stream.getVideoTracks()[0]?.getSettings().facingMode !== "environment";
+    mirrored ?? stream.getVideoTracks()[0]?.getSettings().facingMode === "user";
   return (
     <motion.div
       layoutId="live-camera-in-strip"
