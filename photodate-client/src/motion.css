@@ -1,0 +1,464 @@
+/* Persistent ambient choreography. All geometry is decorative and behind the app. */
+.brand-experiment .has-page-motion .brand-orbit {
+  display: block;
+}
+.has-page-motion.is-quiet .brand-photo {
+  display: none;
+}
+.has-page-motion.is-quiet .brand-ribbon {
+  left: 90%;
+  top: 7%;
+  width: 100px;
+  height: 100px;
+  margin: 0;
+  opacity: 0.12;
+}
+.has-page-motion .brand-ribbon {
+  transition:
+    left 1.2s ease,
+    top 1.2s ease,
+    width 1.2s ease,
+    height 1.2s ease,
+    opacity 1s ease;
+}
+.scene-accordion .brand-ribbon {
+  top: 65%;
+  left: 4%;
+}
+.scene-palette .brand-ribbon {
+  top: 10%;
+  left: 3%;
+}
+.scene-aperture .brand-ribbon {
+  top: 75%;
+  left: 89%;
+  opacity: 0.07;
+}
+.scene-contact .brand-ribbon {
+  top: 8%;
+  left: 89%;
+}
+.scene-prism .brand-ribbon {
+  top: 70%;
+  left: 4%;
+}
+.scene-sparkles .brand-ribbon {
+  top: 9%;
+  left: 4%;
+}
+.scene-ribbon .brand-ribbon {
+  top: 70%;
+  left: 88%;
+}
+.scene-bloom .brand-ribbon {
+  top: 12%;
+  left: 5%;
+}
+.motion-scene {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  perspective: 1100px;
+  overflow: hidden;
+}
+.motion-actor {
+  position: absolute;
+  width: 120px;
+  height: 160px;
+  left: 3%;
+  top: 18%;
+  opacity: 0.24;
+  transform-style: preserve-3d;
+}
+.motion-actor.actor-1 {
+  left: auto;
+  right: 3%;
+  top: 30%;
+}
+.motion-actor.actor-2 {
+  left: 9%;
+  top: 72%;
+  opacity: 0.14;
+}
+.motion-actor.actor-3 {
+  left: auto;
+  right: 8%;
+  top: 78%;
+  opacity: 0.12;
+}
+.motion-object {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: motion-hover 21s ease-in-out infinite;
+  animation-delay: calc(var(--scene-phase) - var(--actor) * 3s);
+}
+.motion-object > i {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border: 1px solid #ffd6ff77;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #e8b9db, #8750a2);
+  box-shadow: 5px 5px 0 #452052;
+  transform-style: preserve-3d;
+}
+.motion-object > i > span {
+  display: block;
+  position: absolute;
+  inset: 8px 8px 24px;
+  border-radius: 3px;
+  background: linear-gradient(145deg, #e348b7, #8036c1 65%, #452568);
+  border: 1px solid #ffffff26;
+}
+.motion-object > i:nth-child(even) > span {
+  background: linear-gradient(135deg, #f7bd97, #dc65a9, #8174d1);
+}
+@keyframes motion-hover {
+  0%,
+  100% {
+    transform: translate3d(0, 0, -20px) rotateX(8deg) rotateY(-18deg)
+      rotateZ(-8deg);
+  }
+  50% {
+    transform: translate3d(12px, -25px, 35px) rotateX(-12deg) rotateY(24deg)
+      rotateZ(8deg);
+  }
+}
+/* Lobby: prints gather into a small constellation, then gently fan apart. */
+.motion-constellation .motion-object > i {
+  width: 64px;
+  height: 84px;
+  inset: auto;
+  top: calc(var(--piece) * 12px);
+  left: calc(var(--piece) * 9px);
+  animation: motion-gather 18s ease-in-out infinite;
+  animation-delay: calc(var(--scene-phase) - var(--piece) * 0.6s);
+}
+@keyframes motion-gather {
+  0%,
+  100% {
+    transform: translateZ(calc(var(--piece) * 5px)) rotateZ(var(--piece-angle));
+  }
+  50% {
+    transform: translate3d(
+        calc(var(--piece) * 5px),
+        calc(var(--piece) * -8px),
+        30px
+      )
+      rotateY(28deg) rotateZ(calc(var(--piece-angle) * -0.4));
+  }
+}
+/* Layout: a paper strip folds along five physical hinges. */
+.motion-accordion .motion-object {
+  width: 75px;
+  height: 200px;
+}
+.motion-accordion .motion-object > i {
+  height: 38px;
+  inset: auto 0;
+  top: calc(var(--piece) * 38px);
+  transform-origin: top center;
+  border-radius: 3px;
+  animation: motion-fold 16s ease-in-out infinite;
+  animation-delay: calc(var(--scene-phase) - var(--piece) * 0.45s);
+}
+.motion-accordion .motion-object > i > span {
+  inset: 4px;
+}
+@keyframes motion-fold {
+  0%,
+  100% {
+    transform: rotateX(8deg) rotateY(-10deg);
+  }
+  50% {
+    transform: rotateX(58deg) rotateY(15deg) translateZ(14px);
+  }
+}
+/* Design: physical color swatches pivot from a shared lower hinge. */
+.motion-palette .motion-object > i,
+.motion-carousel .motion-object > i {
+  width: 66px;
+  height: 115px;
+  inset: auto;
+  bottom: 10px;
+  left: 28px;
+  transform-origin: 50% 95%;
+  animation: motion-fan 20s ease-in-out infinite;
+  animation-delay: var(--scene-phase);
+  background: hsl(calc(285 + var(--piece) * 17) 58% 60%);
+}
+.motion-palette .motion-object > i > span,
+.motion-carousel .motion-object > i > span {
+  inset: 8px 8px 32px;
+  background: linear-gradient(145deg, #ffffff88, #ffffff00);
+}
+@keyframes motion-fan {
+  0%,
+  100% {
+    transform: rotateZ(var(--piece-angle)) rotateY(-20deg)
+      translateZ(calc(var(--piece) * 4px));
+  }
+  50% {
+    transform: rotateZ(calc(var(--piece-angle) * 0.45)) rotateY(22deg)
+      translateZ(calc(var(--piece) * 8px));
+  }
+}
+.motion-carousel .motion-object {
+  animation: motion-carousel 32s linear infinite;
+  animation-delay: var(--scene-phase);
+}
+@keyframes motion-carousel {
+  to {
+    transform: rotateY(360deg) rotateZ(12deg);
+  }
+}
+/* Capture: slow peripheral optics. No flashes, pulses or motion over the video. */
+.motion-aperture .motion-actor {
+  opacity: 0.09;
+  top: 8%;
+  left: 1%;
+  width: 100px;
+  height: 100px;
+}
+.motion-aperture .actor-1 {
+  left: auto;
+  right: 1%;
+  top: 78%;
+}
+.motion-aperture .actor-2,
+.motion-aperture .actor-3 {
+  display: none;
+}
+.motion-aperture .motion-object {
+  animation: motion-lens 48s linear infinite;
+  animation-delay: var(--scene-phase);
+}
+.motion-aperture .motion-object > i {
+  inset: calc(var(--piece) * 8px);
+  border: 2px solid #d58bea;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  transform: translateZ(calc(var(--piece) * 5px))
+    rotateX(calc(var(--piece) * 5deg));
+}
+.motion-aperture span {
+  display: none !important;
+}
+@keyframes motion-lens {
+  from {
+    transform: rotateX(40deg) rotateY(-20deg) rotateZ(0deg);
+  }
+  to {
+    transform: rotateX(40deg) rotateY(-20deg) rotateZ(360deg);
+  }
+}
+/* Review: a hovering contact sheet with staggered, slow photo flips. */
+.motion-contact .motion-object > i {
+  width: 52px;
+  height: 64px;
+  inset: auto;
+  left: 0;
+  top: 0;
+  animation: motion-flip 24s ease-in-out infinite;
+  animation-delay: calc(var(--scene-phase) - var(--piece) * 2s);
+  backface-visibility: hidden;
+}
+.motion-contact .motion-object > i:nth-child(2),
+.motion-contact .motion-object > i:nth-child(4) {
+  left: 58px;
+}
+.motion-contact .motion-object > i:nth-child(3),
+.motion-contact .motion-object > i:nth-child(4) {
+  top: 70px;
+}
+.motion-contact .motion-object > i:nth-child(5) {
+  display: none;
+}
+.motion-contact .motion-object > i > span {
+  inset: 5px 5px 15px;
+}
+@keyframes motion-flip {
+  0%,
+  65%,
+  100% {
+    transform: rotateY(-12deg) translateZ(0);
+  }
+  82% {
+    transform: rotateY(180deg) translateZ(10px);
+  }
+}
+/* Filters: translucent prisms turn and overlap like colored optical glass. */
+.motion-prism .motion-object > i {
+  inset: 25px 10px;
+  border-radius: 0;
+  background: linear-gradient(125deg, #ef56b688, #7a72e788, #f5c59477);
+  box-shadow: none;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  transform-origin: 50% 65%;
+  animation: motion-prism 28s linear infinite;
+  animation-delay: calc(var(--scene-phase) - var(--piece) * 2s);
+}
+.motion-prism span {
+  display: none !important;
+}
+@keyframes motion-prism {
+  from {
+    transform: rotateY(0deg) rotateZ(var(--piece-angle))
+      translateZ(calc(var(--piece) * 12px));
+  }
+  to {
+    transform: rotateY(360deg) rotateZ(var(--piece-angle))
+      translateZ(calc(var(--piece) * 12px));
+  }
+}
+/* Decorations: small four-point charms tumble in different directions. */
+.motion-sparkles .motion-object > i {
+  width: 44px;
+  height: 44px;
+  inset: auto;
+  top: calc(var(--piece) * 27px);
+  left: 0;
+  border: 0;
+  background: linear-gradient(145deg, #ffe4b9, #ed71c7, #a76fe1);
+  clip-path: polygon(
+    50% 0,
+    64% 35%,
+    100% 50%,
+    64% 65%,
+    50% 100%,
+    35% 65%,
+    0 50%,
+    35% 35%
+  );
+  animation: motion-charm 22s ease-in-out infinite;
+  animation-delay: calc(var(--scene-phase) - var(--piece) * 3s);
+}
+.motion-sparkles .motion-object > i:nth-child(even) {
+  left: 60px;
+}
+.motion-sparkles span {
+  display: none !important;
+}
+@keyframes motion-charm {
+  0%,
+  100% {
+    transform: rotateY(0deg) rotateZ(var(--piece-angle));
+  }
+  50% {
+    transform: translate3d(9px, -14px, 25px) rotateY(180deg)
+      rotateZ(calc(var(--piece-angle) + 90deg));
+  }
+}
+/* Export: a print ribbon unrolls toward the viewer. */
+.motion-ribbon .motion-object > i {
+  height: 46px;
+  inset: auto 12px;
+  top: calc(var(--piece) * 42px);
+  transform-origin: 50% 0;
+  animation: motion-print 24s ease-in-out infinite;
+  animation-delay: calc(var(--scene-phase) - var(--piece) * 0.8s);
+  border-radius: 2px;
+}
+.motion-ribbon .motion-object > i > span {
+  inset: 5px;
+}
+@keyframes motion-print {
+  0%,
+  100% {
+    transform: rotateX(-24deg) translateZ(-10px);
+  }
+  50% {
+    transform: rotateX(20deg) translateZ(30px);
+  }
+}
+/* Finish: a photo flower opens, closes, and drifts instead of firing confetti. */
+.motion-bloom .motion-object > i {
+  width: 60px;
+  height: 90px;
+  inset: auto;
+  left: 30px;
+  top: 30px;
+  transform-origin: 50% 100%;
+  animation: motion-bloom 22s ease-in-out infinite;
+  animation-delay: var(--scene-phase);
+}
+@keyframes motion-bloom {
+  0%,
+  100% {
+    transform: rotateZ(calc(var(--piece) * 72deg)) rotateX(8deg)
+      translateY(-15px);
+  }
+  50% {
+    transform: rotateZ(calc(var(--piece) * 72deg + 20deg)) rotateX(38deg)
+      translateY(-35px);
+  }
+}
+/* Card/keyboard interaction stays independent of the decorative scene. */
+.brand-atmosphere[data-paused="true"] .motion-scene * {
+  animation-play-state: paused !important;
+}
+.brand-experiment .studio-card {
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.brand-experiment .studio-card:focus-within {
+  border-color: #c97ddb88;
+  box-shadow:
+    inset 0 1px #ffffff08,
+    0 8px 30px #c133ab12;
+}
+@media (max-width: 1100px) {
+  .motion-actor {
+    width: 82px;
+    height: 120px;
+    opacity: 0.13;
+    left: -22px;
+  }
+  .motion-actor.actor-1,
+  .motion-actor.actor-3 {
+    right: -22px;
+  }
+  .motion-actor.actor-2,
+  .motion-actor.actor-3 {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .motion-actor {
+    opacity: 0.08;
+    left: -36px;
+    top: 13%;
+  }
+  .motion-actor.actor-1 {
+    right: -36px;
+    top: 72%;
+  }
+  .has-page-motion.is-quiet .brand-ribbon {
+    width: 65px;
+    height: 65px;
+    opacity: 0.07;
+  }
+  .motion-aperture .motion-actor {
+    opacity: 0.05;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .motion-scene *,
+  .has-page-motion * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .motion-object > i {
+    transform: rotateZ(var(--piece-angle));
+  }
+  .motion-aperture .motion-object > i {
+    transform: none;
+  }
+  .motion-scene {
+    opacity: 0.5;
+  }
+}
