@@ -15,6 +15,94 @@ function source(file) {
     },
   ).outputText;
 }
+
+test("shooting mode retains the camera position and framing while hiding camera switching", () => {
+  const CameraView = () => null;
+  const jsx = (type, props) => ({ type, props });
+  const room = {
+    roomCode: "ABCDE",
+    selfId: "host",
+    isHost: true,
+    status: "ready",
+    participants: [{ id: "host", display_name: "Host", online: true }],
+    roundId: "round",
+    shotDeadlines: [100, 200, 300, 400],
+    readyParticipantIds: ["host"],
+    approvedParticipantIds: ["host"],
+    connectionStatus: "joined",
+    captureResumeVersion: 0,
+  };
+  const session = {
+    timerMode: 3,
+    shotCount: 4,
+    layoutId: "4x1",
+    designPreset: null,
+    stripTitle: "Photo date",
+    customLayout: null,
+  };
+  const exports = {};
+  vm.runInNewContext(source("../src/pages/CaptureRoom.tsx"), {
+    exports,
+    require: (name) => {
+      if (name === "react")
+        return {
+          useState: (value) => [
+            typeof value === "function" ? value() : value,
+            () => {},
+          ],
+          useEffect() {},
+          useRef: (value) => ({ current: value }),
+          useCallback: (fn) => fn,
+        };
+      if (name === "react/jsx-runtime") return { jsx, jsxs: jsx };
+      if (name.includes("useRoomStore")) return { useRoomStore: () => room };
+      if (name.includes("useSessionStore"))
+        return {
+          useSessionStore: (selector) =>
+            selector ? selector(session) : session,
+        };
+      if (name.includes("stripLayouts"))
+        return {
+          getLayout: () => ({
+            stripAspectRatio: 0.5,
+            slotCount: 4,
+            name: "Classic",
+            mixed: false,
+          }),
+          slotAspectRatio: () => 4 / 3,
+        };
+      if (name === "../components/capture") return { CameraView };
+      return {};
+    },
+  });
+  const cameras = (root) => {
+    const found = [];
+    const walk = (node, path) => {
+      if (!node || typeof node !== "object") return;
+      if (node.type === CameraView) found.push({ path, props: node.props });
+      const children = node.props?.children;
+      (Array.isArray(children) ? children : [children]).forEach((child, i) =>
+        walk(child, path + "/" + i),
+      );
+    };
+    walk(root, "root");
+    return found;
+  };
+  const setup = exports.default();
+  room.status = "capturing";
+  const shooting = exports.default();
+  const before = cameras(setup),
+    after = cameras(shooting);
+  assert.equal(before.length, 1);
+  assert.equal(after.length, 1);
+  assert.equal(before[0].path, after[0].path);
+  assert.equal(after[0].props.allowCameraSwitch, false);
+  assert.equal(
+    before[0].props.captureAspectRatio,
+    after[0].props.captureAspectRatio,
+  );
+  assert.ok(shooting.props.className.includes("is-shooting"));
+});
 test("continuous reel advances, adopts manual scrolling, reverses at edges and resumes without jumps", () => {
   const exports = {};
   const queue = new Map();
@@ -420,4 +508,284 @@ test("crew photo order respects suggested positions and keeps every chosen photo
     3,
   );
   assert.equal(JSON.stringify(order.map((p) => p.frame_index)), "[2,0,1]");
+});
+
+test("custom frames fit within print boundaries at every orientation, count and sideways angle", () => {
+  const geometry = {};
+  vm.runInNewContext(source("../src/lib/customLayout.ts"), {
+    exports: geometry,
+  });
+  for (const aspect of [0.75, 1, 1.5])
+    for (let count = 1; count <= 12; count++) {
+      const layout = geometry.customGrid(count, aspect, true);
+      assert.equal(layout.frames.length, count);
+      for (const original of layout.frames)
+        for (const rotation of [-90, -45, 0, 45, 90]) {
+          const f = geometry.fitFrame(
+            { ...original, x: -40, y: 120, rotation },
+            aspect,
+          );
+          const angle = (rotation * Math.PI) / 180;
+          const w =
+            Math.abs(Math.cos(angle)) * f.width +
+            Math.abs(Math.sin(angle)) * f.height * aspect;
+          const h =
+            (Math.abs(Math.sin(angle)) * f.width) / aspect +
+            Math.abs(Math.cos(angle)) * f.height;
+          assert.ok(f.x + f.width / 2 - w / 2 >= 0);
+          assert.ok(f.x + f.width / 2 + w / 2 <= 100);
+          assert.ok(f.y + f.height / 2 - h / 2 >= 0);
+          assert.ok(f.y + f.height / 2 + h / 2 <= 90);
+        }
+    }
+});
+
+test("custom layout slot count and photo aspect ratios resolve from saved geometry", () => {
+  const layouts = {};
+  vm.runInNewContext(source("../src/data/stripLayouts.ts"), {
+    exports: layouts,
+  });
+  const custom = {
+    aspectRatio: 1.5,
+    frames: [
+      { x: 10, y: 10, width: 40, height: 30, rotation: -10 },
+      { x: 55, y: 15, width: 25, height: 60, rotation: 0 },
+    ],
+  };
+  const result = layouts.getLayout("custom", custom);
+  assert.equal(result.slotCount, 2);
+  assert.equal(result.stripAspectRatio, 1.5);
+  assert.equal(layouts.slotAspectRatio(result, 0), 2);
+  assert.equal(layouts.slotAspectRatio(result, 1), 0.625);
+  assert.equal(result.slots[0].free.rotation, -10);
+});
+
+test("quick resizing preserves photo proportions and its center until print bounds intervene", () => {
+  const geometry = {};
+  vm.runInNewContext(source("../src/lib/customLayout.ts"), {
+    exports: geometry,
+  });
+  const original = { x: 30, y: 30, width: 20, height: 30, rotation: 15 };
+  const larger = geometry.resizeFrame(original, 1.1, 0.75);
+  assert.ok(
+    Math.abs(larger.width / larger.height - original.width / original.height) <
+      1e-10,
+  );
+  assert.ok(Math.abs(larger.x + larger.width / 2 - 40) < 1e-10);
+  assert.ok(Math.abs(larger.y + larger.height / 2 - 45) < 1e-10);
+  for (const factor of [0.01, 100]) {
+    const resized = geometry.resizeFrame(original, factor, 0.75);
+    assert.ok(Math.abs(resized.width / resized.height - 2 / 3) < 1e-10);
+    assert.ok(resized.width > 0 && resized.height > 0);
+  }
+});
+
+test("restart card sends nothing until confirmed and ignores a round that has already changed", () => {
+  const exports = {},
+    sent = [],
+    updates = [];
+  let closed = 0;
+  const room = {
+    roomCode: "ABCDE",
+    isHost: true,
+    roundId: "round-a",
+    status: "capturing",
+  };
+  const jsx = (type, props) => ({ type, props });
+  vm.runInNewContext(
+    source("../src/components/capture/RestartRoundDialog.tsx"),
+    {
+      exports,
+      require: (name) =>
+        name === "react"
+          ? {
+              useRef: () => ({ current: null }),
+              useEffect() {},
+              useState: (value) => [value, (next) => updates.push(next)],
+            }
+          : name === "react/jsx-runtime"
+            ? { jsx, jsxs: jsx }
+            : name.includes("useRoomStore")
+              ? { useRoomStore: { getState: () => room } }
+              : name.includes("lib/socket")
+                ? { socket: { emit: (...args) => sent.push(args) } }
+                : {},
+    },
+  );
+  const tree = exports.default({ roundId: "round-a", onClose: () => closed++ });
+  const buttons = tree.props.children.at(-1).props.children;
+  assert.equal(sent.length, 0);
+  buttons[0].props.onClick();
+  assert.equal(closed, 1);
+  assert.equal(sent.length, 0);
+  buttons[1].props.onClick();
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0][0], "update-room-state");
+  assert.equal(sent[0][1].status, "ready");
+  sent[0][2]({ ok: false, error: { message: "Please reconnect" } });
+  assert.equal(updates.at(-1), "Please reconnect");
+  room.roundId = "round-b";
+  buttons[1].props.onClick();
+  assert.equal(sent.length, 1);
+  assert.equal(closed, 2);
+});
+
+test("the footer caption reads live session text when no preview override is provided", () => {
+  const exports = {},
+    fonts = {};
+  vm.runInNewContext(source("../src/data/textStyles.ts"), { exports: fonts });
+  const state = {
+    stripTitle: "First caption",
+    titleStyle: fonts.DEFAULT_TITLE_STYLE,
+    titlePosition: { x: 50, y: 90, auto: true },
+    customLayout: null,
+    customDesigns: [],
+    designPreset: null,
+  };
+  const hooks = {
+    forwardRef: (fn) => fn,
+    useRef: (value) => ({ current: value }),
+    useState: (value) => [value, () => {}],
+    useEffect() {},
+  };
+  const jsx = (type, props) => ({ type, props });
+  vm.runInNewContext(source("../src/components/editor/StripCanvas.tsx"), {
+    exports,
+    require: (name) =>
+      name === "react"
+        ? { ...hooks, default: hooks }
+        : name === "react/jsx-runtime"
+          ? { jsx, jsxs: jsx }
+          : name.includes("textStyles")
+            ? fonts
+            : name.includes("useSessionStore")
+              ? { useSessionStore: (selector) => selector(state) }
+              : name.includes("stripLayouts")
+                ? {
+                    getLayout: () => ({
+                      id: "4x1",
+                      slots: [],
+                      columns: 1,
+                      rows: 4,
+                      stripAspectRatio: 0.4,
+                      paddingFraction: 0.05,
+                      bottomPaddingFraction: 0.15,
+                      gapFraction: 0.02,
+                    }),
+                  }
+                : name.includes("themePacks")
+                  ? {
+                      ALL_DESIGNS: [
+                        { id: "solid-white", background: "#ffffff" },
+                      ],
+                    }
+                  : name.includes("stripEdges")
+                    ? { stripEdgeStyle: () => ({}) }
+                    : name.includes("designBackground")
+                      ? { designBackground: () => ({}) }
+                      : {},
+  });
+  const caption = (tree) => {
+    if (!tree || typeof tree !== "object") return undefined;
+    if (tree.props?.["data-caption-text"]) return tree.props.children;
+    const children = tree.props?.children;
+    for (const child of Array.isArray(children) ? children : [children]) {
+      const found = caption(child);
+      if (found !== undefined) return found;
+    }
+  };
+  const props = { layoutId: "4x1", designId: "solid-white" };
+  assert.equal(caption(exports.StripCanvas(props, null)), "First caption");
+  state.stripTitle = "A new memory";
+  assert.equal(caption(exports.StripCanvas(props, null)), "A new memory");
+  state.stripTitle = "";
+  assert.equal(caption(exports.StripCanvas(props, null)), undefined);
+});
+
+test("text layers drag in print percentages on a scaled preview, commit on release and stay read-only on export", () => {
+  const exports = {},
+    committed = [];
+  const layer = {
+    id: "text-1",
+    text: "Hello",
+    x: 50,
+    y: 50,
+    width: 60,
+    fontSize: 72,
+    rotation: 0,
+    style: {
+      font: "modern",
+      size: 1,
+      color: "#ffffff",
+      bold: true,
+      italic: false,
+    },
+  };
+  const store = (selector) => selector({ textLayers: [layer] });
+  store.getState = () => ({
+    updateTextLayer: (...args) => committed.push(args),
+  });
+  const jsx = (type, props) => ({ type, props });
+  vm.runInNewContext(source("../src/components/editor/TextLayers.tsx"), {
+    exports,
+    require: (name) =>
+      name === "react"
+        ? {
+            useRef: (value) => ({ current: value }),
+            useState: (value) => [value, () => {}],
+            useEffect() {},
+          }
+        : name === "react/jsx-runtime"
+          ? { jsx, jsxs: jsx }
+          : name.includes("useSessionStore")
+            ? { useSessionStore: store }
+            : name.includes("textStyles")
+              ? { titleFont: () => "Arial" }
+              : {},
+  });
+  const render = (editable) => {
+    const list = exports.default({
+      editable,
+      selectedId: layer.id,
+      autoColor: "#333333",
+      onSelect: () => {},
+    });
+    const item = list.props.children[0];
+    return item.type(item.props);
+  };
+  const editing = render(true);
+  const event = {
+    button: 0,
+    pointerId: 1,
+    clientX: 100,
+    clientY: 200,
+    stopPropagation() {},
+    preventDefault() {},
+    target: { closest: () => null },
+    currentTarget: {
+      parentElement: {
+        getBoundingClientRect: () => ({
+          left: 0,
+          top: 0,
+          width: 250,
+          height: 500,
+        }),
+      },
+      setPointerCapture() {},
+    },
+  };
+  editing.props.onPointerDown(event);
+  editing.props.onPointerMove({ ...event, clientX: 125, clientY: 250 });
+  assert.equal(committed.length, 0);
+  editing.props.onPointerUp(event);
+  assert.equal(committed[0][1].x, 60);
+  assert.equal(committed[0][1].y, 60);
+  editing.props.onPointerDown(event);
+  editing.props.onPointerMove({ ...event, clientX: 200 });
+  editing.props.onPointerCancel();
+  assert.equal(committed.length, 1);
+  const output = render(false);
+  assert.equal(output.props.style.pointerEvents, "none");
+  assert.equal(output.props.children[1], false);
+  assert.equal(output.props.children[0], "Hello");
 });
