@@ -91,7 +91,15 @@ export default function Layout({ children }: LayoutProps) {
       applying = true;
       const previous = useRoomStore.getState();
       if (previous.roundId !== snapshot.roundId)
-        useRoomStore.setState({ capturedFrameIndexes: [] });
+        useRoomStore.setState({
+          capturedFrameIndexes:
+            snapshot.retakeFrameIndex !== undefined &&
+            snapshot.retakeFrameIndex !== null
+              ? Array.from({ length: snapshot.frameCount }, (_, i) => i).filter(
+                  (i) => i !== snapshot.retakeFrameIndex,
+                )
+              : [],
+        });
       if (snapshot.captures)
         useRoomStore.setState({
           capturedFrameIndexes: snapshot.captures
@@ -109,6 +117,8 @@ export default function Layout({ children }: LayoutProps) {
         useSessionStore.setState({
           assignedPhotos: [],
           placedStickers: [],
+          photoEdits: [],
+          photoSources: [],
           textLayers: [],
           drawStrokes: [],
           filterId: getPhotoStyle(useSessionStore.getState().themePack?.id)
@@ -118,6 +128,7 @@ export default function Layout({ children }: LayoutProps) {
         status: snapshot.room.status as typeof previous.status,
         participants: snapshot.participants,
         roundId: snapshot.roundId,
+        retakeFrameIndex: snapshot.retakeFrameIndex ?? null,
         shotDeadlines: snapshot.shotDeadlines.map(
           (deadline) =>
             deadline - ((snapshot.serverTime ?? Date.now()) - Date.now()),
@@ -130,6 +141,10 @@ export default function Layout({ children }: LayoutProps) {
         reviewApprovals: snapshot.reviewApprovals ?? [],
         reviewRevision: snapshot.reviewRevision ?? "",
         reviewPhotos: (snapshot.editor.assignedPhotos as string[]) ?? [],
+        reviewPhotoEdits:
+          (snapshot.editor
+            .photoEdits as import("../../../../shared/contracts").PhotoEdit[]) ??
+          [],
       });
       const hasPendingEdit =
         previous.isHost &&
@@ -144,6 +159,8 @@ export default function Layout({ children }: LayoutProps) {
         clearTimeout(debounce);
         debounce = undefined;
         useSessionStore.setState({
+          photoEdits: [],
+          photoSources: [],
           textLayers: [],
           titleStyle: { ...DEFAULT_TITLE_STYLE },
           titlePosition: { x: 50, y: 90, auto: true },
@@ -239,6 +256,8 @@ export default function Layout({ children }: LayoutProps) {
           placedStickers,
           drawStrokes,
           stripTitle,
+          photoEdits,
+          photoSources,
           textLayers,
           titleStyle,
           titlePosition,
@@ -257,6 +276,8 @@ export default function Layout({ children }: LayoutProps) {
               placedStickers,
               drawStrokes,
               stripTitle,
+              photoEdits,
+              photoSources,
               textLayers,
               titleStyle,
               titlePosition,

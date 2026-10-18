@@ -3,6 +3,7 @@ import type {
   CustomLayout,
   TitleStyle,
   TextLayer,
+  PhotoEdit,
 } from "../../../shared/contracts";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
@@ -75,6 +76,8 @@ export type TimerMode = number;
 
 export interface SessionState {
   textLayers: TextLayer[];
+  photoEdits: PhotoEdit[];
+  photoSources: (number | null)[];
   customLayout: CustomLayout | null;
   /** Selected theme pack, null = not chosen yet */
   themePack: ThemePack | null;
@@ -144,6 +147,8 @@ export type SessionStore = SessionState & SessionActions;
 
 const initialState: SessionState = {
   textLayers: [],
+  photoEdits: [],
+  photoSources: [],
   titleStyle: { ...DEFAULT_TITLE_STYLE },
   customLayout: null,
   themePack: null,

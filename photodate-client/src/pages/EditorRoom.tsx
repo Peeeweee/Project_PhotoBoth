@@ -1,3 +1,6 @@
+import RetakeShotDialog from "../components/capture/RetakeShotDialog";
+import PhotoCropDialog from "../components/editor/PhotoCropDialog";
+import { DEFAULT_PHOTO_EDIT } from "../lib/photoEdit";
 import { suggestedPhotoOrder } from "../lib/photoOrder";
 import RoomChat from "../components/RoomChat";
 import { publishStage } from "../lib/session";
@@ -8,7 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { useRoomStore } from "../state/useRoomStore";
 import { useSessionStore } from "../state/useSessionStore";
 import { StripCanvas } from "../components/editor";
-import { getLayout } from "../data/stripLayouts";
+import { getLayout, slotAspectRatio } from "../data/stripLayouts";
 import { socket } from "../lib/socket";
 import { getCaptures } from "../lib/api";
 
@@ -25,6 +28,7 @@ export default function EditorRoom() {
     reviewApprovals,
     reviewRevision,
     reviewPhotos,
+    reviewPhotoEdits,
   } = useRoomStore();
   const {
     layoutId,
@@ -39,14 +43,36 @@ export default function EditorRoom() {
   const layout = getLayout(layoutId, customLayout);
   const designId = designPreset?.id || "classic";
 
+  const [retakeShot, setRetakeShot] = useState<number | null>(null);
+  const photoSources = useSessionStore((s) => s.photoSources);
+  const [cropSlot, setCropSlot] = useState<number | null>(null);
+  const photoEdits = useSessionStore((s) => s.photoEdits);
   const [captures, setCaptures] = useState<
     { id: string; image_url: string; frame_index: number }[]
   >([]);
   const assignedPhotos = useSessionStore((s) => s.assignedPhotos).length
     ? useSessionStore.getState().assignedPhotos
     : Array<string | null>(layout.slotCount).fill(null);
-  const setAssignedPhotos = (photos: (string | null)[]) =>
-    setGlobalAssignedPhotos(photos.map((p) => p ?? ""));
+  const setAssignedPhotos = (photos: (string | null)[]) => {
+    const current = useSessionStore.getState();
+    const next = photos.map((p) => p ?? "");
+    useSessionStore.setState({
+      assignedPhotos: next,
+      photoEdits: next.map((photo, i) => {
+        const old =
+          photo === current.assignedPhotos[i]
+            ? i
+            : current.assignedPhotos.indexOf(photo);
+        return photo && old >= 0
+          ? (current.photoEdits[old] ?? { ...DEFAULT_PHOTO_EDIT })
+          : { ...DEFAULT_PHOTO_EDIT };
+      }),
+      photoSources: next.map(
+        (photo) =>
+          captures.find((c) => c.image_url === photo)?.frame_index ?? null,
+      ),
+    });
+  };
   const [voteError, setVoteError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -59,6 +85,22 @@ export default function EditorRoom() {
         const data = await getCaptures(roomCode);
         const sorted = await composeCaptures(data.captures);
         setCaptures(sorted);
+        if (useRoomStore.getState().isHost) {
+          const current = useSessionStore.getState();
+          const restored = current.assignedPhotos.map(
+            (photo, i) =>
+              photo ||
+              (current.photoSources[i] !== null &&
+              current.photoSources[i] !== undefined
+                ? (sorted.find((c) => c.frame_index === current.photoSources[i])
+                    ?.image_url ?? "")
+                : ""),
+          );
+          if (
+            JSON.stringify(restored) !== JSON.stringify(current.assignedPhotos)
+          )
+            useSessionStore.setState({ assignedPhotos: restored });
+        }
       } catch (err) {
         setLoadError(
           err instanceof Error ? err.message : "Could not load photos",
@@ -84,9 +126,7 @@ export default function EditorRoom() {
   // Handle removing a photo from the strip
   const handleSlotClick = (index: number) => {
     if (isHost && assignedPhotos[index]) {
-      const newAssigned = [...assignedPhotos];
-      newAssigned[index] = null;
-      setAssignedPhotos(newAssigned);
+      setCropSlot(index);
     }
   };
 
@@ -112,7 +152,8 @@ export default function EditorRoom() {
   const isComplete =
     assignedPhotos.length === layout.slotCount && assignedPhotos.every(Boolean);
   const orderSynced =
-    JSON.stringify(assignedPhotos) === JSON.stringify(reviewPhotos);
+    JSON.stringify(assignedPhotos) === JSON.stringify(reviewPhotos) &&
+    JSON.stringify(photoEdits) === JSON.stringify(reviewPhotoEdits);
   const allApproved =
     participants.length > 0 &&
     participants.every((p) => reviewApprovals.includes(p.id));
@@ -120,7 +161,16 @@ export default function EditorRoom() {
     if (!isHost || to < 0 || to >= assignedPhotos.length) return;
     const next = [...assignedPhotos];
     [next[from], next[to]] = [next[to], next[from]];
-    setAssignedPhotos(next);
+    const current = useSessionStore.getState();
+    const edits = [...current.photoEdits],
+      sources = [...current.photoSources];
+    [edits[from], edits[to]] = [edits[to], edits[from]];
+    [sources[from], sources[to]] = [sources[to], sources[from]];
+    useSessionStore.setState({
+      assignedPhotos: next.map((p) => p ?? ""),
+      photoEdits: edits,
+      photoSources: sources,
+    });
   };
 
   const handleNext = () => {
@@ -203,7 +253,7 @@ export default function EditorRoom() {
           </div>
           <p className="studio-note">
             {isHost
-              ? "Tap a photo to fill the next empty frame. Tap a frame in the preview to clear it."
+              ? "Tap a photo to fill the next empty frame. Tap a frame in the preview to crop, zoom or reposition it."
               : "Your host is arranging the shared strip. Watch it come together here."}
           </p>
           <div className="photo-library-grid">
@@ -238,6 +288,15 @@ export default function EditorRoom() {
                       </span>
                     )}
                   </button>
+                  {isHost && (
+                    <button
+                      className="shot-retake-button"
+                      disabled={connectionStatus !== "joined"}
+                      onClick={() => setRetakeShot(capture.frame_index)}
+                    >
+                      ↻ Retake this shot
+                    </button>
+                  )}
                   <div className="photo-vote-controls">
                     <button
                       aria-pressed={!!mine}
@@ -375,6 +434,26 @@ export default function EditorRoom() {
                 )}
                 {isHost && (
                   <>
+                    {photo && (
+                      <button
+                        className="studio-text-button"
+                        onClick={() => setCropSlot(i)}
+                      >
+                        Adjust
+                      </button>
+                    )}
+                    {photo && (
+                      <button
+                        className="studio-text-button"
+                        onClick={() => {
+                          const next = [...assignedPhotos];
+                          next[i] = null;
+                          setAssignedPhotos(next);
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
                     <button
                       className="studio-text-button"
                       aria-label={`Move frame ${i + 1} earlier`}
@@ -476,6 +555,37 @@ export default function EditorRoom() {
           <ArrowRight size={17} />
         </button>
       </footer>
+      {retakeShot !== null && (
+        <RetakeShotDialog
+          frame={retakeShot}
+          slotIndexes={assignedPhotos.flatMap((photo, i) =>
+            photoSources[i] === retakeShot ||
+            photo ===
+              captures.find((capture) => capture.frame_index === retakeShot)
+                ?.image_url
+              ? [i]
+              : [],
+          )}
+          onClose={() => setRetakeShot(null)}
+        />
+      )}
+      {cropSlot !== null && assignedPhotos[cropSlot] && (
+        <PhotoCropDialog
+          src={assignedPhotos[cropSlot]!}
+          index={cropSlot}
+          aspect={slotAspectRatio(layout, cropSlot)}
+          initial={photoEdits[cropSlot]}
+          onClose={() => setCropSlot(null)}
+          onSave={(edit) => {
+            const edits = Array.from(
+              { length: layout.slotCount },
+              (_, i) => photoEdits[i] ?? { ...DEFAULT_PHOTO_EDIT },
+            );
+            edits[cropSlot] = edit;
+            useSessionStore.setState({ photoEdits: edits });
+          }}
+        />
+      )}
     </section>
   );
 }

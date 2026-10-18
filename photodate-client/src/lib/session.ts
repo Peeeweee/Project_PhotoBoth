@@ -21,6 +21,8 @@ export function publishStage(stage: string, onSuccess?: () => void) {
     placedStickers,
     drawStrokes,
     stripTitle,
+    photoEdits,
+    photoSources,
     textLayers,
     titleStyle,
     titlePosition,
@@ -40,6 +42,8 @@ export function publishStage(stage: string, onSuccess?: () => void) {
         placedStickers,
         drawStrokes,
         stripTitle,
+        photoEdits,
+        photoSources,
         textLayers,
         titleStyle,
         titlePosition,
@@ -54,4 +58,24 @@ export function publishStage(stage: string, onSuccess?: () => void) {
       else onSuccess?.();
     },
   );
+}
+
+export function editorSnapshot() {
+  const s = useSessionStore.getState();
+  return {
+    customLayout: s.customLayout,
+    assignedPhotos: s.assignedPhotos,
+    placedStickers: s.placedStickers,
+    drawStrokes: s.drawStrokes,
+    stripTitle: s.stripTitle,
+    photoEdits: s.photoEdits,
+    photoSources: s.photoSources,
+    textLayers: s.textLayers,
+    titleStyle: s.titleStyle,
+    titlePosition: s.titlePosition,
+    filterId: s.filterId,
+    showWatermark: s.showWatermark,
+    designPreset: s.designPreset,
+    layoutId: s.layoutId,
+  };
 }

@@ -1,3 +1,4 @@
+import { photoPresentation } from "../../lib/photoEdit";
 import TextLayers from "./TextLayers";
 import { DEFAULT_TITLE_STYLE, titleFont } from "../../data/textStyles";
 import { stripEdgeStyle } from "../../lib/stripEdges";
@@ -107,6 +108,7 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
     },
     ref,
   ) => {
+    const photoEdits = useSessionStore((s) => s.photoEdits);
     const storedTitle = useSessionStore((state) => state.stripTitle);
     const title = explicitTitle ?? storedTitle;
     const titleStyle =
@@ -324,7 +326,7 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
                         style={{
                           width: "100%",
                           height: "100%",
-                          objectFit: "contain",
+                          ...photoPresentation(photoEdits[slot.index]),
                           display: "block",
                           transition: "opacity 0.2s",
                         }}

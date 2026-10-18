@@ -1,4 +1,8 @@
-import type { RoomMessage, PhotoVote } from "../../../shared/contracts";
+import type {
+  RoomMessage,
+  PhotoVote,
+  PhotoEdit,
+} from "../../../shared/contracts";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { RoomStatus, SocketParticipant } from "../lib/socket";
@@ -12,6 +16,7 @@ export interface RoomState {
   roomId: string | null;
   sessionToken: string | null;
   roundId: string | null;
+  retakeFrameIndex: number | null;
   cameraReady: boolean;
   connectionStatus:
     "disconnected" | "connecting" | "joining" | "joined" | "error";
@@ -26,6 +31,7 @@ export interface RoomState {
   reviewApprovals: string[];
   reviewRevision: string;
   reviewPhotos: string[];
+  reviewPhotoEdits: PhotoEdit[];
   /** 5-char human join code */
   roomCode: string | null;
   /** host_id stored in the room row */
@@ -66,6 +72,7 @@ const initialState: RoomState = {
   roomId: null,
   sessionToken: null,
   roundId: null,
+  retakeFrameIndex: null,
   cameraReady: false,
   connectionStatus: "disconnected",
   captureResumeVersion: 0,
@@ -79,6 +86,7 @@ const initialState: RoomState = {
   reviewApprovals: [],
   reviewRevision: "",
   reviewPhotos: [],
+  reviewPhotoEdits: [],
   roomCode: null,
   hostId: null,
   selfId: null,

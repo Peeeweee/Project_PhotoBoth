@@ -24,6 +24,7 @@ export default function CaptureRoom() {
     status,
     participants,
     roundId,
+    retakeFrameIndex,
     shotDeadlines,
     readyParticipantIds,
     approvedParticipantIds,
@@ -136,7 +137,11 @@ export default function CaptureRoom() {
     });
     setCounting(false);
     setFlashShot((n) => n + 1);
-    setIndex((i) => Math.max(i, frame + 1));
+    setIndex((i) =>
+      current.retakeFrameIndex != null
+        ? current.shotDeadlines.length
+        : Math.max(i, frame + 1),
+    );
     pending.current.push({ index: frame, data, roundId: capturedRound });
     try {
       if (!roomCode || !selfId) throw new Error("Session missing");
@@ -200,7 +205,15 @@ export default function CaptureRoom() {
   const crewProgress = activeCapture
     ? readyParticipantIds.length
     : approvedParticipantIds.length;
-  const completedShots = Math.min(index, shotDeadlines.length || shotCount);
+  const completedShots =
+    retakeFrameIndex !== null && retakeFrameIndex !== undefined
+      ? Math.max(0, shotDeadlines.length - 1) +
+        (index >= shotDeadlines.length ? 1 : 0)
+      : Math.min(index, shotDeadlines.length || shotCount);
+  const shotTaken = (i: number) =>
+    retakeFrameIndex !== null && retakeFrameIndex !== undefined
+      ? i !== retakeFrameIndex || index >= shotDeadlines.length
+      : i < completedShots;
   const vote = () => {
     if (!roomCode) return;
     setVotePending(true);
@@ -221,6 +234,12 @@ export default function CaptureRoom() {
     <section
       className={`studio-page capture-studio${layout.stripAspectRatio >= 1 ? " has-wide-keepsake" : ""}${activeCapture ? " is-shooting" : ""}`}
     >
+      {retakeFrameIndex !== null && retakeFrameIndex !== undefined && (
+        <div className="retake-session-note" role="status">
+          Retaking shot {retakeFrameIndex + 1} only. Your other photos are kept.{" "}
+          {!activeCapture && "Everyone approves before the new countdown."}
+        </div>
+      )}
       {activeCapture && (
         <div className="shoot-session-heading">
           <div className="shoot-session-title">
@@ -463,15 +482,15 @@ export default function CaptureRoom() {
                 {Array.from({ length: shotDeadlines.length }, (_, i) => (
                   <div
                     key={i}
-                    className={`shoot-contact-frame${i < completedShots ? " is-taken" : i === index ? " is-next" : ""}`}
-                    aria-label={`Photo ${i + 1}: ${i < completedShots ? "taken" : i === index ? "up next" : "waiting"}`}
+                    className={`shoot-contact-frame${shotTaken(i) ? " is-taken" : i === index ? " is-next" : ""}`}
+                    aria-label={`Photo ${i + 1}: ${shotTaken(i) ? "taken" : i === index ? "up next" : "waiting"}`}
                   >
                     {localShots[i] ? (
                       <img src={localShots[i]} alt={`Your shot ${i + 1}`} />
                     ) : (
                       <span>{String(i + 1).padStart(2, "0")}</span>
                     )}
-                    {i < completedShots && <Check size={11} />}
+                    {shotTaken(i) && <Check size={11} />}
                   </div>
                 ))}
               </div>
@@ -483,7 +502,7 @@ export default function CaptureRoom() {
                   <li
                     key={i}
                     className={
-                      i < completedShots
+                      shotTaken(i)
                         ? "is-complete"
                         : activeCapture && i === index
                           ? "is-current"
@@ -493,7 +512,7 @@ export default function CaptureRoom() {
                       activeCapture && i === index ? "step" : undefined
                     }
                   >
-                    {i < completedShots ? <Check size={16} /> : i + 1}
+                    {shotTaken(i) ? <Check size={16} /> : i + 1}
                   </li>
                 ),
               )}
