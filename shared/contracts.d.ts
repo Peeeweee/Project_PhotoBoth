@@ -41,6 +41,9 @@ export interface RoomMessage {
   displayName: string;
   text: string;
   sentAt: number;
+  kind?: "departure";
+  reason?: string;
+  wasHost?: boolean;
 }
 export interface PhotoVote {
   participantId: string;
@@ -109,7 +112,10 @@ export interface ClientToServerEvents<
     },
     ack: Ack<Editor>,
   ) => void;
-  "leave-room": (payload: Member, ack: Ack<Editor>) => void;
+  "leave-room": (
+    payload: Member & { reason?: string },
+    ack: Ack<Editor>,
+  ) => void;
   "review-approval": (
     payload: Member & { revision: string; approved: boolean },
     ack: Ack<Editor>,
@@ -135,6 +141,7 @@ export interface ClientToServerEvents<
       layoutId: string | null;
       designId: string | null;
       customDesign?: unknown;
+      customLayout?: unknown;
     },
     ack: Ack<Editor>,
   ) => void;
@@ -207,4 +214,35 @@ export interface GetCapturesResponse {
   status: "ok";
   captures: CaptureRecord[];
   roundId: string | null;
+}
+
+export interface CustomFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+}
+export interface CustomLayout {
+  aspectRatio: number;
+  frames: CustomFrame[];
+}
+
+export interface TitleStyle {
+  font: "typewriter" | "modern" | "elegant" | "handwritten" | "rounded";
+  size: number;
+  color: string;
+  bold: boolean;
+  italic: boolean;
+}
+
+export interface TextLayer {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  rotation: number;
+  style: TitleStyle;
 }
