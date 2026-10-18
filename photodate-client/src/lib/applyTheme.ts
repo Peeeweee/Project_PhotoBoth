@@ -1,4 +1,5 @@
 import { THEMES } from "../data/themes";
+import { studioTokens } from "../data/studioThemes";
 
 /**
  * Complete list of CSS custom properties that themes are allowed to override.
@@ -24,6 +25,9 @@ const THEME_VARS = [
   "--c-error",
   "--font-ui",
   "--font-mono",
+  "--studio-button",
+  "--studio-companion",
+  "--studio-display",
 ] as const;
 
 /** All known body theme classes — cleared before applying a new one */
@@ -42,9 +46,13 @@ export function applyTheme(themeId: string): void {
   THEME_VARS.forEach((v) => root.style.removeProperty(v));
 
   // 2. Stamp new overrides
-  Object.entries(theme.cssOverrides).forEach(([k, v]) => {
-    root.style.setProperty(k, v);
-  });
+  root.dataset.photoStyle = theme.id;
+  const studio = root.classList.contains("brand-experiment");
+  Object.entries(studio ? studioTokens(theme.id) : theme.cssOverrides).forEach(
+    ([k, v]) => {
+      root.style.setProperty(k, v, studio ? "important" : "");
+    },
+  );
 
   // 3. Swap body class for atmospheric effects (grain, glow, etc.)
   document.body.classList.remove(...BODY_CLASSES);
@@ -56,6 +64,7 @@ export function applyTheme(themeId: string): void {
 /** Remove all theme overrides and revert to CSS defaults */
 export function resetTheme(): void {
   const root = document.documentElement;
+  delete root.dataset.photoStyle;
   THEME_VARS.forEach((v) => root.style.removeProperty(v));
   document.body.classList.remove(...BODY_CLASSES);
 }
