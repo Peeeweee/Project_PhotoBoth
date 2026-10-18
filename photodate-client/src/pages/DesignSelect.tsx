@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Palette } from "lucide-react";
+import { ArrowRight, Palette } from "lucide-react";
 import { useSessionStore } from "../state/useSessionStore";
 import { useRoomStore } from "../state/useRoomStore";
 import { socket } from "../lib/socket";
@@ -24,7 +24,8 @@ const fadeUp: any = {
 export default function DesignSelect() {
   const navigate = useNavigate();
   const { designPreset, setDesignPreset, layoutId } = useSessionStore();
-  const layout = getLayout(layoutId);
+  const customLayout = useSessionStore((s) => s.customLayout);
+  const layout = getLayout(layoutId, customLayout);
   const edge = EDGE_STYLES.find(
     (e) => e.id === (designPreset?.edgeStyle ?? "square"),
   )!;
@@ -49,6 +50,7 @@ export default function DesignSelect() {
           layoutId: layoutId,
           designId: designPreset.id,
           customDesign: designPreset,
+          customLayout: layoutId === "custom" ? customLayout : null,
         },
         (ack) => {
           if (ack.ok) {
@@ -81,13 +83,7 @@ export default function DesignSelect() {
       }}
     >
       {error && <p role="alert">{error}</p>}
-      <button
-        className="studio-text-button capture-back"
-        onClick={() => navigate("/layout")}
-        disabled={isStarting}
-      >
-        <ArrowLeft size={16} /> Back to strips
-      </button>
+
       <motion.div
         variants={{ show: { transition: { staggerChildren: 0.1 } } }}
         initial="hidden"
