@@ -3,7 +3,7 @@ import type {
   RoomMessage,
   PhotoVote,
 } from "../../shared/contracts";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import { EventEmitter } from "events";
 import db, {
   roomQueries,
@@ -582,9 +582,30 @@ export function markParticipantConnected(participantId: string) {
     "INSERT INTO participant_leases(participant_id,expires_at) VALUES(?,NULL) ON CONFLICT(participant_id) DO UPDATE SET expires_at=NULL",
   ).run(participantId);
 }
-export function removeParticipant(roomId: string, participantId: string) {
+export const LEAVE_REASONS = [
+  "Session finished",
+  "I need to go",
+  "Camera or microphone trouble",
+  "Connection problems",
+  "Joining another room",
+  "Prefer not to say",
+];
+export function leaveReason(value: unknown) {
+  if (value === undefined) return undefined;
+  assert(
+    typeof value === "string" && LEAVE_REASONS.includes(value),
+    "Choose a valid leave reason",
+  );
+  return value as string;
+}
+export function removeParticipant(
+  roomId: string,
+  participantId: string,
+  reason?: string,
+) {
   const room = roomQueries.findById(roomId);
   if (!room) return;
+  const name = participantQueries.findById(participantId)?.display_name;
   db.transaction(() => {
     if (room.host_id === participantId) {
       roomQueries.setStatus(roomId, "closed");
@@ -595,6 +616,19 @@ export function removeParticipant(roomId: string, participantId: string) {
       ).run(roomId);
     } else participantQueries.delete(participantId);
     const d = document(roomId);
+    if (reason && name) {
+      d.messages.push({
+        id: randomUUID(),
+        participantId,
+        displayName: name,
+        kind: "departure",
+        reason,
+        wasHost: room.host_id === participantId,
+        text: `${name} ${room.host_id === participantId ? "ended the room" : "left the room"}. Reason: ${reason}.`,
+        sentAt: Date.now(),
+      });
+      d.messages = d.messages.slice(-50);
+    }
     d.photoVotes = d.photoVotes.filter(
       (v) => v.participantId !== participantId,
     );
