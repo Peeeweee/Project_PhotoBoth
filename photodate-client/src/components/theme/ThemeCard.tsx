@@ -1,138 +1,89 @@
-import { motion } from 'framer-motion';
-import type { ThemeDefinition } from '../../data/themes';
+import { motion } from "framer-motion";
+import type { ThemeDefinition } from "../../data/themes";
+import { getPhotoStyle } from "../../data/photoStyles";
+import { ALL_DESIGNS } from "../../data/themePacks";
+import { FILTER_PRESETS } from "../../data/filterPresets";
+import { designBackground } from "../design/designBackground";
 
-interface ThemeCardProps {
+export default function ThemeCard({
+  theme,
+  selected,
+  onSelect,
+}: {
   theme: ThemeDefinition;
   selected: boolean;
   onSelect: (theme: ThemeDefinition) => void;
-}
-
-export default function ThemeCard({ theme, selected, onSelect }: ThemeCardProps) {
+}) {
+  const style = getPhotoStyle(theme.id);
+  const design = ALL_DESIGNS.find((d) => d.id === style.designId)!;
+  const filter = FILTER_PRESETS.find((f) => f.id === style.filterId)!;
   return (
     <motion.button
       id={`theme-card-${theme.id}`}
+      className={`photo-style-card photo-style-${theme.id}`}
       aria-pressed={selected}
+      aria-label={`${theme.name}: ${style.subtitle}`}
       onClick={() => onSelect(theme)}
-      whileHover={{ y: -4, scale: 1.01 }}
       whileTap={{ scale: 0.98 }}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      style={{
-        flex: 1,
-        minWidth: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-        padding: 0,
-        background: 'var(--c-surface-1)',
-        border: `1.5px solid ${selected ? 'var(--c-accent)' : 'var(--c-border)'}`,
-        borderRadius: 'var(--r-lg)',
-        cursor: 'pointer',
-        overflow: 'hidden',
-        boxShadow: selected ? 'var(--shadow-accent)' : 'var(--shadow-sm)',
-        transition: 'border-color var(--dur-base), box-shadow var(--dur-base)',
-        textAlign: 'left',
-
-      }}
     >
-      {/* ── Preview swatch ─────────────────────────────────── */}
       <div
-        style={{
-          width: '100%',
-          aspectRatio: '4 / 3',
-          background: theme.previewBg,
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-        }}
+        className="photo-style-stage"
+        style={{ background: style.previewBg }}
+        aria-hidden="true"
       >
-        {/* Mini photo-strip preview */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 3,
-          padding: 8,
-          background: 'rgba(0,0,0,0.18)',
-          borderRadius: 6,
-          backdropFilter: 'blur(2px)',
-        }}>
-          {[1, 2].map(i => (
+        <div className="style-print" style={designBackground(design)}>
+          {[0, 1, 2].map((pose) => (
             <div
-              key={i}
-              style={{
-                width: 44,
-                height: 32,
-                borderRadius: 3,
-                background: `rgba(255,255,255,${i === 1 ? 0.22 : 0.12})`,
-                border: `1px solid rgba(255,255,255,0.15)`,
-              }}
-            />
+              className="style-sample"
+              key={pose}
+              style={{ filter: filter.cssFilter }}
+            >
+              <svg viewBox="0 0 100 62" fill="none">
+                <rect width="100" height="62" fill="#c5dce4" />
+                <circle cx="79" cy="14" r="10" fill="#ffdc9a" />
+                <path d="M0 43L23 19L53 48L72 29L100 55V62H0Z" fill="#8bae9d" />
+                <path d="M17 62C17 38 51 38 51 62" fill="#dc82a4" />
+                <circle cx="34" cy="31" r="12" fill="#b98367" />
+                <path
+                  d="M22 29C20 11 50 10 46 31L40 22L25 24Z"
+                  fill="#463b4d"
+                />
+                <path d="M52 62C52 37 88 37 88 62" fill="#8a83b6" />
+                <circle cx="70" cy="30" r="12" fill="#e5b894" />
+                <path
+                  d="M58 29C57 12 84 12 82 30L76 22L61 25Z"
+                  fill="#665147"
+                />
+                {pose === 1 && (
+                  <path
+                    d="M22 49L12 30M80 49L91 29"
+                    stroke="#b98367"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                  />
+                )}
+                {pose === 2 && (
+                  <path
+                    d="M42 42L50 36L59 42"
+                    stroke="#e5b894"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                  />
+                )}
+              </svg>
+            </div>
           ))}
+          <span className="style-print-caption">PhotoDate ♡</span>
         </div>
-
-        {/* Large icon overlay */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 8,
-            right: 10,
-            fontSize: 22,
-            color: theme.previewFg,
-            opacity: 0.55,
-            fontWeight: 900,
-            lineHeight: 1,
-            userSelect: 'none',
-          }}
-        >
-          {theme.icon}
-        </div>
-
-        {/* Selected check */}
-        {selected && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-            style={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              width: 22,
-              height: 22,
-              borderRadius: '50%',
-              background: 'var(--c-accent)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              color: '#fff',
-              fontWeight: 700,
-            }}
-          >
-            ✓
-          </motion.div>
-        )}
+        <span className="style-preview-label">Illustrated sample</span>
+        {selected && <span className="style-selected-check">✓</span>}
       </div>
-
-      {/* ── Text area ──────────────────────────────────────── */}
-      <div style={{ padding: 'var(--sp-3) var(--sp-4) var(--sp-4)' }}>
-        <div style={{
-          fontWeight: 700,
-          fontSize: 'var(--text-base)',
-          color: selected ? 'var(--c-text-hi)' : 'var(--c-text-md)',
-          marginBottom: 2,
-          transition: 'color var(--dur-fast)',
-        }}>
-          {theme.name}
-        </div>
-        <div style={{
-          fontSize: 'var(--text-xs)',
-          color: 'var(--c-text-lo)',
-          lineHeight: 1.4,
-        }}>
-          {theme.subtitle}
-        </div>
+      <div className="photo-style-copy">
+        <strong>{theme.name}</strong>
+        <span>{style.subtitle}</span>
+        <small>
+          {design.name} · {filter.name}
+        </small>
       </div>
     </motion.button>
   );
