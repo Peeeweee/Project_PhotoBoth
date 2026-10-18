@@ -5,6 +5,7 @@ import { useRoomStore } from "../../state/useRoomStore";
 import { useSessionStore } from "../../state/useSessionStore";
 import { socket } from "../../lib/socket";
 import { publishStage } from "../../lib/session";
+import ReturnToSetupDialog from "./ReturnToSetupDialog";
 
 export default function BackButton() {
   const { pathname } = useLocation();
@@ -12,6 +13,10 @@ export default function BackButton() {
   const { roomCode, isHost, status, connectionStatus } = useRoomStore();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [setupRequest, setSetupRequest] = useState<{
+    code: string;
+    roundId: string | null;
+  } | null>(null);
   const stages: Record<string, string> = {
     "/filter": "editor",
     "/decorate": "filter",
@@ -51,13 +56,14 @@ export default function BackButton() {
       return;
     }
     if (pathname === "/capture" || pathname === "/editor") {
-      if (
-        pathname === "/editor" &&
-        !window.confirm(
-          "Return to setup? This clears the current round’s photos and approvals for everyone.",
-        )
-      )
+      if (pathname === "/editor") {
+        if (roomCode)
+          setSetupRequest({
+            code: roomCode,
+            roundId: useRoomStore.getState().roundId,
+          });
         return;
+      }
       if (!roomCode) return;
       const design = useSessionStore.getState().designPreset;
       setPending(true);
@@ -109,6 +115,16 @@ export default function BackButton() {
         <span className="global-back-error" role="alert">
           {error}
         </span>
+      )}
+      {setupRequest && (
+        <ReturnToSetupDialog
+          request={setupRequest}
+          onClose={() => setSetupRequest(null)}
+          onReturned={() => {
+            setSetupRequest(null);
+            navigate("/layout");
+          }}
+        />
       )}
     </div>
   );

@@ -220,7 +220,10 @@ test("shared Back navigation keeps lobby membership, protects active shots and s
             useLocation: () => ({ pathname }),
             useNavigate: () => (path) => navigated.push(path),
           };
-        if (name.includes("useRoomStore")) return { useRoomStore: () => room };
+        if (name.includes("useRoomStore"))
+          return {
+            useRoomStore: Object.assign(() => room, { getState: () => room }),
+          };
         if (name.includes("useSessionStore"))
           return {
             useSessionStore: {
@@ -280,7 +283,76 @@ test("shared Back navigation keeps lobby membership, protects active shots and s
   assert.equal(host.navigated[0], "/editor");
   const review = scenario("/editor", { status: "reviewing" });
   review.button.props.onClick();
-  assert.equal(review.emitted.length, 0); // declining a destructive retake preserves photos
+  assert.equal(review.emitted.length, 0); // Opening the card preserves photos until confirmed.
+});
+
+test("return-to-setup card preserves photos on cancel, reports failure and rejects stale rounds", () => {
+  const exports = {},
+    sent = [],
+    updates = [];
+  let closed = 0,
+    returned = 0;
+  const room = {
+    roomCode: "ABCDE",
+    roundId: "round-a",
+    isHost: true,
+    status: "reviewing",
+  };
+  const jsx = (type, props) => ({ type, props });
+  vm.runInNewContext(
+    source("../src/components/layout/ReturnToSetupDialog.tsx"),
+    {
+      exports,
+      require: (name) =>
+        name === "react"
+          ? {
+              useRef: () => ({ current: null }),
+              useEffect() {},
+              useState: (value) => [value, (next) => updates.push(next)],
+            }
+          : name === "react/jsx-runtime"
+            ? { jsx, jsxs: jsx }
+            : name.includes("useRoomStore")
+              ? { useRoomStore: { getState: () => room } }
+              : name.includes("useSessionStore")
+                ? {
+                    useSessionStore: {
+                      getState: () => ({ designPreset: null }),
+                    },
+                  }
+                : name.includes("lib/socket")
+                  ? {
+                      socket: {
+                        timeout: () => ({ emit: (...args) => sent.push(args) }),
+                      },
+                    }
+                  : {},
+    },
+  );
+  const tree = exports.default({
+    request: { code: "ABCDE", roundId: "round-a" },
+    onClose: () => closed++,
+    onReturned: () => returned++,
+  });
+  assert.equal(tree.props.role, "alertdialog");
+  const buttons = tree.props.children.at(-1).props.children;
+  assert.equal(sent.length, 0);
+  buttons[0].props.onClick();
+  assert.equal(closed, 1);
+  assert.equal(sent.length, 0);
+  buttons[1].props.onClick();
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0][1].status, "waiting");
+  sent[0][2](null, { ok: false, error: { message: "Please reconnect" } });
+  assert.equal(updates.at(-1), "Please reconnect");
+  assert.equal(returned, 0);
+  room.roundId = "round-b";
+  buttons[1].props.onClick();
+  assert.equal(sent.length, 1);
+  room.roundId = "round-a";
+  buttons[1].props.onClick();
+  sent[1][2](null, { ok: true });
+  assert.equal(returned, 1);
 });
 test("scheduled camera callbacks retain their original frame and fire at most once", () => {
   const refs = [],
