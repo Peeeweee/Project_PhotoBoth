@@ -501,6 +501,7 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
           code,
           editor: {
             title: "Shared",
+            assignedPhotos: [png],
             stripTitle: "Our night",
             titlePosition: { x: 25, y: 75 },
           },
