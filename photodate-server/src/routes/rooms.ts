@@ -18,6 +18,7 @@ import {
   storageQuota,
   reclaimExpiredParticipants,
   removeParticipant,
+  leaveReason,
 } from "../runtime";
 const router = Router();
 router.use((req, res, next) => {
@@ -206,7 +207,7 @@ router.get("/:code/captures", (req, res) => {
 router.post("/:code/leave", (req, res) => {
   const room = roomByCode(req.params.code),
     p = authenticate(room, credential(req));
-  removeParticipant(room.id, p.id);
+  removeParticipant(room.id, p.id, leaveReason(object(req.body).reason));
   res.json({ status: "ok" });
 });
 export default router;
