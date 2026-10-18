@@ -343,6 +343,7 @@ export default function CameraView({
   const remote = participants.filter((p) => p.id !== selfId);
   return (
     <div
+      className="camera-view"
       style={{
         position: "relative",
         width: "100%",
@@ -388,6 +389,7 @@ export default function CameraView({
         Switch camera
       </button>
       <div
+        className="camera-source-label"
         style={{
           position: "absolute",
           bottom: 12,
@@ -439,6 +441,7 @@ export default function CameraView({
       )}
       {count !== null && count > 0 && (
         <div
+          className="camera-countdown"
           aria-live="assertive"
           style={{
             position: "absolute",
@@ -451,7 +454,7 @@ export default function CameraView({
             textShadow: "0 4px 24px #000",
           }}
         >
-          {count}
+          <span key={count}>{count}</span>
         </div>
       )}
     </div>
