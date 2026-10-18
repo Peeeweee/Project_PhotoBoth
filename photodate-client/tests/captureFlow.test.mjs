@@ -15,6 +15,185 @@ function source(file) {
     },
   ).outputText;
 }
+test("continuous reel advances, adopts manual scrolling, reverses at edges and resumes without jumps", () => {
+  const exports = {};
+  const queue = new Map();
+  let id = 0,
+    paused = false;
+  vm.runInNewContext(source("../src/lib/reelAutoplay.ts"), {
+    exports,
+    window: {
+      requestAnimationFrame(callback) {
+        queue.set(++id, callback);
+        return id;
+      },
+      cancelAnimationFrame(key) {
+        queue.delete(key);
+      },
+    },
+  });
+  const node = { scrollWidth: 1000, clientWidth: 300, scrollLeft: 0 };
+  const stop = exports.beginReelAutoplay(node, () => paused);
+  const tick = (time) => {
+    const [key, callback] = queue.entries().next().value;
+    queue.delete(key);
+    callback(time);
+  };
+  tick(0);
+  tick(16);
+  assert.ok(node.scrollLeft > 0 && node.scrollLeft < 1);
+  tick(32);
+  assert.ok(node.scrollLeft > 1);
+  paused = true;
+  const before = node.scrollLeft;
+  tick(5000);
+  assert.equal(node.scrollLeft, before);
+  paused = false;
+  tick(5016);
+  assert.ok(node.scrollLeft > before && node.scrollLeft - before < 1);
+  node.scrollLeft = 350;
+  tick(5032);
+  assert.ok(node.scrollLeft > 350 && node.scrollLeft < 351);
+  node.scrollLeft = 700;
+  tick(5048);
+  assert.ok(node.scrollLeft < 700 && node.scrollLeft > 699);
+  tick(5064);
+  assert.ok(node.scrollLeft < 699);
+  stop();
+  assert.equal(queue.size, 0);
+});
+
+test("ambient motion keeps its phase across room updates and joins the shared clock on navigation", () => {
+  const timing = {};
+  vm.runInNewContext(source("../src/lib/brandMotion.ts"), {
+    exports: timing,
+    Math,
+  });
+  const exports = {};
+  let now = 5000,
+    cached,
+    reduced = false;
+  vm.runInNewContext(source("../src/components/MotionScene.tsx"), {
+    exports,
+    Array,
+    Date: { now: () => now },
+    require: (name) =>
+      name === "react"
+        ? { useState: (init) => [(cached ??= init()), () => {}] }
+        : name === "framer-motion"
+          ? { motion: { div: "motion.div" }, useReducedMotion: () => reduced }
+          : name.includes("brandMotion")
+            ? timing
+            : {
+                jsx: (type, props) => ({ type, props }),
+                jsxs: (type, props) => ({ type, props }),
+              },
+  });
+  const first = exports.default({ name: "palette", start: 1000 });
+  assert.equal(first.props.style["--scene-phase"], "-4s");
+  now = 9000;
+  assert.equal(
+    exports.default({ name: "palette", start: 1000 }).props.style[
+      "--scene-phase"
+    ],
+    "-4s",
+  );
+  cached = undefined; // a new route mounts its own choreography
+  const next = exports.default({ name: "prism", start: 1000 });
+  assert.equal(next.props.style["--scene-phase"], "-8s");
+  reduced = true;
+  assert.equal(
+    exports.default({ name: "prism", start: 1000 }).props.transition.duration,
+    0,
+  );
+});
+test("shared Back navigation keeps lobby membership, protects active shots and synchronizes host steps", () => {
+  function scenario(pathname, overrides = {}) {
+    const navigated = [],
+      emitted = [],
+      stages = [];
+    const room = {
+      roomCode: "ABCDE",
+      isHost: true,
+      status: "ready",
+      connectionStatus: "joined",
+      ...overrides,
+    };
+    const design = { id: "solid-white", edgeStyle: "ticket" };
+    const exports = {};
+    vm.runInNewContext(source("../src/components/layout/BackButton.tsx"), {
+      exports,
+      window: { confirm: () => false },
+      require: (name) => {
+        if (name === "react")
+          return { useState: (initial) => [initial, () => {}] };
+        if (name === "react-router-dom")
+          return {
+            useLocation: () => ({ pathname }),
+            useNavigate: () => (path) => navigated.push(path),
+          };
+        if (name.includes("useRoomStore")) return { useRoomStore: () => room };
+        if (name.includes("useSessionStore"))
+          return {
+            useSessionStore: {
+              getState: () => ({
+                designPreset: design,
+                setDesignPreset: () => {},
+              }),
+            },
+          };
+        if (name.includes("socket"))
+          return {
+            socket: {
+              timeout: () => ({
+                emit: (event, payload, ack) => {
+                  emitted.push({ event, payload });
+                  ack(null, { ok: true });
+                },
+              }),
+            },
+          };
+        if (name.includes("session"))
+          return {
+            publishStage: (stage, done) => {
+              stages.push(stage);
+              done();
+            },
+          };
+        return {
+          jsx: (type, props) => ({ type, props }),
+          jsxs: (type, props) => ({ type, props }),
+        };
+      },
+    });
+    const button = exports.default().props.children[0];
+    return { button, navigated, emitted, stages };
+  }
+  const lobby = scenario("/lobby");
+  lobby.button.props.onClick();
+  assert.equal(lobby.navigated[0], "/");
+  assert.equal(lobby.emitted.length, 0);
+  const capture = scenario("/capture");
+  capture.button.props.onClick();
+  assert.equal(capture.emitted[0].payload.status, "waiting");
+  assert.equal(capture.navigated[0], "/layout");
+  assert.equal(
+    scenario("/capture", { status: "capturing" }).button.props.disabled,
+    true,
+  );
+  const guest = scenario("/filter", { isHost: false, status: "editing" });
+  guest.button.props.onClick();
+  assert.equal(guest.stages.length, 0);
+  assert.equal(guest.emitted.length, 0);
+  assert.equal(guest.navigated[0], "/");
+  const host = scenario("/filter", { status: "editing" });
+  host.button.props.onClick();
+  assert.equal(host.stages[0], "editor");
+  assert.equal(host.navigated[0], "/editor");
+  const review = scenario("/editor", { status: "reviewing" });
+  review.button.props.onClick();
+  assert.equal(review.emitted.length, 0); // declining a destructive retake preserves photos
+});
 test("scheduled camera callbacks retain their original frame and fire at most once", () => {
   const refs = [],
     effects = [],
@@ -96,6 +275,80 @@ test("scheduled camera callbacks retain their original frame and fire at most on
   timers.at(-1)();
   assert.equal(captured.length, 2);
   assert.equal(canvas.width / canvas.height, 1280 / 720); // mixed layouts preserve the camera's full image
+});
+test("external camera selection requests the exact device, releases it, and never falls back silently", async () => {
+  async function open(fail) {
+    const refs = [],
+      effects = [],
+      requests = [],
+      errors = [],
+      mirrors = [];
+    let stopped = 0;
+    const track = {
+      getSettings: () => ({ deviceId: "usb-camera" }),
+      stop: () => stopped++,
+    };
+    const stream = { getTracks: () => [track], getVideoTracks: () => [track] };
+    const exports = {};
+    vm.runInNewContext(source("../src/components/capture/CameraView.tsx"), {
+      exports,
+      Set,
+      Error,
+      navigator: {
+        mediaDevices: {
+          getUserMedia: async (constraints) => {
+            requests.push(constraints);
+            if (fail)
+              throw Object.assign(new Error("External camera unavailable"), {
+                name: "OverconstrainedError",
+              });
+            return stream;
+          },
+          enumerateDevices: async () => [],
+        },
+      },
+      require: (name) =>
+        name === "react"
+          ? {
+              useRef: (value) => {
+                const ref = { current: value };
+                refs.push(ref);
+                return ref;
+              },
+              useState: (initial) => [initial, () => {}],
+              useEffect: (effect) => effects.push(effect),
+            }
+          : name.includes("deviceSupport")
+            ? { cameraErrorMessage: (error) => error.message }
+            : {
+                jsx: (type, props) => ({ type, props }),
+                jsxs: (type, props) => ({ type, props }),
+              },
+    });
+    exports.default({
+      deviceId: "usb-camera",
+      isCountingDown: false,
+      timerSeconds: 3,
+      frameIndex: 0,
+      roundId: null,
+      onCapture: () => {},
+      onError: (message) => errors.push(message),
+      onMirroredChange: (value) => mirrors.push(value),
+    });
+    refs[1].current = { srcObject: null, play: async () => {} };
+    const cleanup = effects[0]();
+    await new Promise(setImmediate);
+    cleanup();
+    return { requests, errors, mirrors, stopped };
+  }
+  const connected = await open(false);
+  assert.equal(connected.requests[0].video.deviceId.exact, "usb-camera");
+  assert.equal(connected.requests[0].audio, false);
+  assert.equal(connected.mirrors[0], false);
+  assert.equal(connected.stopped, 1);
+  const missing = await open(true);
+  assert.equal(missing.requests.length, 1);
+  assert.equal(missing.errors[0], "External camera unavailable");
 });
 test("group composition fits the selected frame without cropping any participant image", async () => {
   const draws = [],
