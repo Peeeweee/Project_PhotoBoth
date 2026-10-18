@@ -35,7 +35,8 @@ export default function EditorRoom() {
     setShowWatermark,
   } = useSessionStore();
 
-  const layout = getLayout(layoutId);
+  const customLayout = useSessionStore((s) => s.customLayout);
+  const layout = getLayout(layoutId, customLayout);
   const designId = designPreset?.id || "classic";
 
   const [captures, setCaptures] = useState<
@@ -413,23 +414,21 @@ export default function EditorRoom() {
             }
             onClick={() => {
               if (!roomCode) return;
-              socket
-                .timeout(8000)
-                .emit(
-                  "review-approval",
-                  {
-                    code: roomCode,
-                    revision: reviewRevision,
-                    approved: !reviewApprovals.includes(selfId ?? ""),
-                  },
-                  (timeout, ack) => {
-                    if (timeout)
-                      setVoteError(
-                        "Approval not confirmed. Check your connection and try again.",
-                      );
-                    else if (!ack.ok) setVoteError(ack.error.message);
-                  },
-                );
+              socket.timeout(8000).emit(
+                "review-approval",
+                {
+                  code: roomCode,
+                  revision: reviewRevision,
+                  approved: !reviewApprovals.includes(selfId ?? ""),
+                },
+                (timeout, ack) => {
+                  if (timeout)
+                    setVoteError(
+                      "Approval not confirmed. Check your connection and try again.",
+                    );
+                  else if (!ack.ok) setVoteError(ack.error.message);
+                },
+              );
             }}
           >
             {reviewApprovals.includes(selfId ?? "") && orderSynced
