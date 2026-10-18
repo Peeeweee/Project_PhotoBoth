@@ -134,12 +134,12 @@ export const getCaptures = (code: string) =>
     `/rooms/${encodeURIComponent(normalizeRoomCode(code))}/captures`,
   );
 
-export const leaveRoom = (code: string) =>
+export const leaveRoom = (code: string, reason?: string) =>
   request<{ status: string }>(
     `/rooms/${encodeURIComponent(normalizeRoomCode(code))}/leave`,
     {
       method: "POST",
       keepalive: true,
-      body: "{}",
+      body: JSON.stringify({ reason }),
     },
   );
