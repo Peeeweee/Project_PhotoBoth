@@ -15,6 +15,9 @@ export interface CameraViewProps {
   captureAspectRatio?: number;
   allowCameraSwitch?: boolean;
   preserveSourceAspect?: boolean;
+  deviceId?: string;
+  onDevices?: (devices: MediaDeviceInfo[]) => void;
+  onMirroredChange?: (mirrored: boolean) => void;
   isActive?: boolean;
   participants?: { id: string; display_name: string; slot_index: number }[];
   selfId?: string;
@@ -33,6 +36,9 @@ export default function CameraView({
   captureAspectRatio = 16 / 9,
   allowCameraSwitch = true,
   preserveSourceAspect = false,
+  deviceId = "",
+  onDevices,
+  onMirroredChange,
   onCapture,
   isActive = true,
   participants = [],
@@ -50,6 +56,8 @@ export default function CameraView({
     onCapture,
     onStream,
     onCountdownChange,
+    onDevices,
+    onMirroredChange,
   });
   callbacks.current = {
     onReady,
@@ -57,6 +65,8 @@ export default function CameraView({
     onCapture,
     onStream,
     onCountdownChange,
+    onDevices,
+    onMirroredChange,
   };
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
@@ -108,7 +118,9 @@ export default function CameraView({
           );
         const constraints: MediaStreamConstraints = {
           video: {
-            facingMode: { ideal: facing },
+            ...(deviceId
+              ? { deviceId: { exact: deviceId } }
+              : { facingMode: { ideal: facing } }),
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
@@ -117,7 +129,11 @@ export default function CameraView({
         try {
           stream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch (cause) {
-          if (cause instanceof Error && cause.name === "OverconstrainedError")
+          if (
+            !deviceId &&
+            cause instanceof Error &&
+            cause.name === "OverconstrainedError"
+          )
             stream = await navigator.mediaDevices.getUserMedia({
               video: true,
               audio: false,
@@ -128,10 +144,23 @@ export default function CameraView({
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
-        setMirrored(
-          (stream.getVideoTracks()[0]?.getSettings().facingMode ?? facing) !==
-            "environment",
-        );
+        void navigator.mediaDevices
+          .enumerateDevices?.()
+          .then((devices) => {
+            if (!cancelled)
+              callbacks.current.onDevices?.(
+                devices.filter((d) => d.kind === "videoinput"),
+              );
+          })
+          .catch(() => {});
+        const actualFacing = stream
+          .getVideoTracks()[0]
+          ?.getSettings().facingMode;
+        const shouldMirror = actualFacing
+          ? actualFacing === "user"
+          : !deviceId && facing === "user";
+        setMirrored(shouldMirror);
+        callbacks.current.onMirroredChange?.(shouldMirror);
         if (video) {
           video.srcObject = stream;
           callbacks.current.onStream?.(stream);
@@ -171,7 +200,28 @@ export default function CameraView({
       if (video) video.srcObject = null;
       callbacks.current.onReady?.(false);
     };
-  }, [isActive, retry, facing]);
+  }, [isActive, retry, facing, deviceId]);
+  useEffect(() => {
+    let cancelled = false;
+    const media = navigator.mediaDevices;
+    const refresh = () => {
+      void media
+        ?.enumerateDevices?.()
+        .then((devices) => {
+          if (!cancelled)
+            callbacks.current.onDevices?.(
+              devices.filter((d) => d.kind === "videoinput"),
+            );
+        })
+        .catch(() => {});
+    };
+    refresh();
+    media?.addEventListener?.("devicechange", refresh);
+    return () => {
+      cancelled = true;
+      media?.removeEventListener?.("devicechange", refresh);
+    };
+  }, []);
   useEffect(() => {
     const visibility = () => {
       if (document.visibilityState === "hidden") {
@@ -325,7 +375,12 @@ export default function CameraView({
       <button
         className="camera-switch"
         type="button"
-        disabled={!allowCameraSwitch || !ready}
+        disabled={!allowCameraSwitch || !ready || !!deviceId}
+        title={
+          deviceId
+            ? "Choose Automatic in the camera picker to switch front/rear cameras"
+            : "Switch front/rear camera"
+        }
         onClick={() =>
           setFacing((value) => (value === "user" ? "environment" : "user"))
         }
