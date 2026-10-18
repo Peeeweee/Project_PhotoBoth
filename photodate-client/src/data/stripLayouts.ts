@@ -1,3 +1,4 @@
+import type { CustomLayout, CustomFrame } from "../../../shared/contracts";
 /**
  * stripLayouts.ts
  *
@@ -36,6 +37,7 @@ import type { LayoutId } from "../state/useSessionStore";
 export interface SlotDef {
   /** 0-based capture order index */
   index: number;
+  free?: CustomFrame;
   /** 0-based grid column start */
   col: number;
   /** 0-based grid row start */
@@ -448,6 +450,8 @@ export const AVAILABLE_LAYOUTS = STRIP_LAYOUTS.filter((l) => l.available);
 /** Actual ratio of a spanned slot, including the gaps it covers. */
 export function slotAspectRatio(layout: StripLayout, index: number): number {
   const slot = layout.slots[index] ?? layout.slots[0];
+  if (slot.free)
+    return (slot.free.width / slot.free.height) * layout.stripAspectRatio;
   const w =
     (1 -
       2 * layout.paddingFraction -
@@ -465,7 +469,35 @@ export function slotAspectRatio(layout: StripLayout, index: number): number {
  * When multiple entries share an id (planned stubs), returns the first
  * `available` one, or the first entry as a fallback.
  */
-export function getLayout(id: LayoutId): StripLayout {
+export function getLayout(
+  id: LayoutId,
+  custom?: CustomLayout | null,
+): StripLayout {
+  if (id === "custom" && custom?.frames.length)
+    return {
+      id: "custom",
+      name: "Your custom keepsake",
+      label: `${custom.frames.length} frames`,
+      description: "Arranged by you",
+      slotCount: custom.frames.length,
+      columns: 1,
+      rows: 1,
+      stripAspectRatio: custom.aspectRatio,
+      frameAspectRatio: 1,
+      gapFraction: 0,
+      paddingFraction: 0,
+      bottomPaddingFraction: 0.08,
+      available: true,
+      mixed: true,
+      slots: custom.frames.map((free, index) => ({
+        index,
+        col: 0,
+        row: 0,
+        colSpan: 1,
+        rowSpan: 1,
+        free,
+      })),
+    };
   return (
     STRIP_LAYOUTS.find((l) => l.id === id && l.available) ??
     STRIP_LAYOUTS.find((l) => l.id === id) ??
