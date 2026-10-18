@@ -1,3 +1,9 @@
+import { DEFAULT_TITLE_STYLE } from "../data/textStyles";
+import type {
+  CustomLayout,
+  TitleStyle,
+  TextLayer,
+} from "../../../shared/contracts";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
@@ -33,6 +39,7 @@ export interface ThemePack {
 
 /** Strip layout: how captured frames are arranged */
 export type LayoutId =
+  | "custom"
   | "portrait-pair"
   | "landscape-film"
   | "mixed-story"
@@ -67,6 +74,8 @@ export interface DesignPreset {
 export type TimerMode = number;
 
 export interface SessionState {
+  textLayers: TextLayer[];
+  customLayout: CustomLayout | null;
   /** Selected theme pack, null = not chosen yet */
   themePack: ThemePack | null;
   /** Selected layout, null = not chosen yet */
@@ -83,6 +92,7 @@ export interface SessionState {
   drawStrokes: DrawStroke[];
   /** The title of the strip, defaults to today's date */
   stripTitle: string;
+  titleStyle: TitleStyle;
   titlePosition: { x: number; y: number; auto?: boolean };
   /** Session-specific custom designs uploaded by the user */
   customDesigns: DesignPreset[];
@@ -100,6 +110,10 @@ export interface SessionState {
 }
 
 interface SessionActions {
+  addTextLayer: (layer: TextLayer) => void;
+  updateTextLayer: (id: string, patch: Partial<TextLayer>) => void;
+  removeTextLayer: (id: string) => void;
+  setTitleStyle: (style: TitleStyle) => void;
   setTitlePosition: (position: {
     x: number;
     y: number;
@@ -129,6 +143,9 @@ export type SessionStore = SessionState & SessionActions;
 // ── Initial state ────────────────────────────────────────────
 
 const initialState: SessionState = {
+  textLayers: [],
+  titleStyle: { ...DEFAULT_TITLE_STYLE },
+  customLayout: null,
   themePack: null,
   layoutId: "4x1",
   designPreset: null,
@@ -149,6 +166,7 @@ const initialState: SessionState = {
 
 function shotCountFromLayout(id: LayoutId): number {
   const map: Record<LayoutId, number> = {
+    custom: 4,
     "2x1": 2,
     "2x2": 4,
     "3x1": 3,
@@ -179,7 +197,13 @@ export const useSessionStore = create<SessionStore>()(
       setThemePack: (themePack) => set({ themePack }),
 
       setLayoutId: (layoutId) =>
-        set({ layoutId, shotCount: shotCountFromLayout(layoutId) }),
+        set((s) => ({
+          layoutId,
+          shotCount:
+            layoutId === "custom"
+              ? (s.customLayout?.frames.length ?? 4)
+              : shotCountFromLayout(layoutId),
+        })),
 
       setDesignPreset: (designPreset) => set({ designPreset }),
 
@@ -219,6 +243,22 @@ export const useSessionStore = create<SessionStore>()(
 
       clearDrawStrokes: () => set({ drawStrokes: [] }),
 
+      addTextLayer: (layer) =>
+        set((s) => ({
+          textLayers:
+            s.textLayers.length < 12 ? [...s.textLayers, layer] : s.textLayers,
+        })),
+      updateTextLayer: (id, patch) =>
+        set((s) => ({
+          textLayers: s.textLayers.map((layer) =>
+            layer.id === id ? { ...layer, ...patch, id } : layer,
+          ),
+        })),
+      removeTextLayer: (id) =>
+        set((s) => ({
+          textLayers: s.textLayers.filter((layer) => layer.id !== id),
+        })),
+      setTitleStyle: (titleStyle) => set({ titleStyle }),
       setStripTitle: (stripTitle) => set({ stripTitle }),
       setTitlePosition: (titlePosition) => set({ titlePosition }),
 
@@ -271,6 +311,7 @@ export const useSessionStore = create<SessionStore>()(
       partialize: (s) => ({
         themePack: s.themePack,
         layoutId: s.layoutId,
+        customLayout: s.customLayout,
         timerMode: s.timerMode,
         shotCount: s.shotCount,
         isGroupMode: s.isGroupMode,
