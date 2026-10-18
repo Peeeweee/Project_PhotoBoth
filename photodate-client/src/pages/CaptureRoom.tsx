@@ -206,7 +206,9 @@ export default function CaptureRoom() {
       );
   };
   return (
-    <section className="studio-page capture-studio">
+    <section
+      className={`studio-page capture-studio${layout.stripAspectRatio >= 1 ? " has-wide-keepsake" : ""}`}
+    >
       {isHost && !activeCapture && (
         <button
           className="studio-text-button capture-back"
@@ -384,7 +386,14 @@ export default function CaptureRoom() {
                   : "All captured"}
               </span>
             </div>
-            <div className="capture-strip-preview">
+            <div
+              className="capture-strip-preview"
+              style={
+                layout.stripAspectRatio >= 1
+                  ? { aspectRatio: String(layout.stripAspectRatio) }
+                  : undefined
+              }
+            >
               {flashShot > 0 && (
                 <div
                   key={flashShot}
