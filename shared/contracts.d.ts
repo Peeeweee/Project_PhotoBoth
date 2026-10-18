@@ -35,6 +35,24 @@ export interface CaptureRecord {
   round_id: string;
   captured_at: string;
 }
+export interface RoomMessage {
+  id: string;
+  participantId: string;
+  displayName: string;
+  text: string;
+  sentAt: number;
+}
+export interface PhotoVote {
+  participantId: string;
+  frameIndex: number;
+  position: number | null;
+}
+export interface CollaborationState {
+  roomId: string;
+  messages: RoomMessage[];
+  photoVotes: PhotoVote[];
+  roundId: string | null;
+}
 export interface RoomSnapshot<Editor extends object = Record<string, unknown>> {
   room: RoomRecord;
   participants: ParticipantRecord[];
@@ -42,6 +60,8 @@ export interface RoomSnapshot<Editor extends object = Record<string, unknown>> {
   stage: string;
   roundId: string | null;
   frameCount: number;
+  messages: RoomMessage[];
+  photoVotes: PhotoVote[];
   shotDeadlines: number[];
   readyParticipantIds: string[];
   approvedParticipantIds: string[];
@@ -70,6 +90,19 @@ export interface ClientToServerEvents<
 > {
   "join-room": (
     payload: Member & { sessionToken: string },
+    ack: Ack<Editor>,
+  ) => void;
+  "send-message": (
+    payload: Member & { text: string },
+    ack: Ack<Editor>,
+  ) => void;
+  "vote-photo": (
+    payload: Member & {
+      roundId: string;
+      frameIndex: number;
+      selected: boolean;
+      position?: number | null;
+    },
     ack: Ack<Editor>,
   ) => void;
   "leave-room": (payload: Member, ack: Ack<Editor>) => void;
@@ -109,6 +142,7 @@ export interface ClientToServerEvents<
 export interface ServerToClientEvents<
   Editor extends object = Record<string, unknown>,
 > {
+  "collaboration-changed": (payload: CollaborationState) => void;
   "room-snapshot": (payload: RoomSnapshot<Editor>) => void;
   "editor-state-changed": (payload: {
     roomId: string;

@@ -1,4 +1,8 @@
-import type { RoomSnapshot } from "../../shared/contracts";
+import type {
+  RoomSnapshot,
+  RoomMessage,
+  PhotoVote,
+} from "../../shared/contracts";
 import { createHash, randomBytes } from "crypto";
 import { EventEmitter } from "events";
 import db, {
@@ -77,6 +81,8 @@ export interface Document {
   stage: string;
   roundId: string | null;
   frameCount: number;
+  messages: RoomMessage[];
+  photoVotes: PhotoVote[];
   shotDeadlines: number[];
   readyParticipantIds: string[];
   approvedParticipantIds: string[];
@@ -98,6 +104,8 @@ export function document(roomId: string): Document {
     stage: "editor",
     roundId: null,
     frameCount: 4,
+    messages: [],
+    photoVotes: [],
     shotDeadlines: [],
     readyParticipantIds: [],
     approvedParticipantIds: [],
@@ -254,6 +262,10 @@ export function rate(key: string, limit = 120) {
     for (const [k, v] of buckets) if (v.until < now) buckets.delete(k);
 }
 export const layouts = [
+  "landscape-2",
+  "landscape-3",
+  "portrait-4",
+  "group-wide",
   "2x1",
   "2x2",
   "3x1",
@@ -537,6 +549,9 @@ export function removeParticipant(roomId: string, participantId: string) {
       ).run(roomId);
     } else participantQueries.delete(participantId);
     const d = document(roomId);
+    d.photoVotes = d.photoVotes.filter(
+      (v) => v.participantId !== participantId,
+    );
     d.readyParticipantIds = d.readyParticipantIds.filter(
       (id) => id !== participantId,
     );

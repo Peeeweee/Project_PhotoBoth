@@ -1,3 +1,4 @@
+import type { RoomMessage, PhotoVote } from "../../../shared/contracts";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { RoomStatus, SocketParticipant } from "../lib/socket";
@@ -20,6 +21,8 @@ export interface RoomState {
   readyParticipantIds: string[];
   approvedParticipantIds: string[];
   stage: string;
+  messages: RoomMessage[];
+  photoVotes: PhotoVote[];
   /** 5-char human join code */
   roomCode: string | null;
   /** host_id stored in the room row */
@@ -68,6 +71,8 @@ const initialState: RoomState = {
   readyParticipantIds: [],
   approvedParticipantIds: [],
   stage: "editor",
+  messages: [],
+  photoVotes: [],
   roomCode: null,
   hostId: null,
   selfId: null,

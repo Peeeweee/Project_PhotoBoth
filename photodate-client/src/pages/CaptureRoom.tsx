@@ -11,6 +11,7 @@ import {
   Users,
   ArrowRight,
 } from "lucide-react";
+import { getLayout } from "../data/stripLayouts";
 import { CameraView } from "../components/capture";
 export default function CaptureRoom() {
   const {
@@ -26,7 +27,11 @@ export default function CaptureRoom() {
     connectionStatus,
     captureResumeVersion,
   } = useRoomStore();
-  const { timerMode, shotCount } = useSessionStore();
+  const { timerMode, shotCount, layoutId } = useSessionStore();
+  const columns = participants.length > 1 ? 2 : 1;
+  const rows = Math.ceil(Math.max(1, participants.length) / columns);
+  const cameraAspect = (getLayout(layoutId).frameAspectRatio * rows) / columns;
+  const capturedKeys = useRef(new Set<string>());
   const [flashShot, setFlashShot] = useState(0);
   const [votePending, setVotePending] = useState(false);
   const [ready, setReady] = useState(false);
@@ -38,6 +43,7 @@ export default function CaptureRoom() {
   const pending = useRef<
     { index: number; data: string; roundId: string | null }[]
   >([]);
+  const uploadedFrames = useRef(new Set<number>());
   const roundRef = useRef(roundId);
   roundRef.current = roundId;
   const onReady = useCallback((value: boolean) => {
@@ -57,7 +63,9 @@ export default function CaptureRoom() {
     const changed = lastRound.current !== roundId;
     lastRound.current = roundId;
     setIndex((current) => (changed ? next : Math.max(current, next)));
-    setUploaded(frames.length);
+    if (changed) uploadedFrames.current.clear();
+    frames.forEach((frame) => uploadedFrames.current.add(frame));
+    setUploaded(uploadedFrames.current.size);
     setCounting(false);
     if (changed) pending.current = [];
   }, [roundId, captureResumeVersion]);
@@ -67,19 +75,35 @@ export default function CaptureRoom() {
     setRemaining(Math.max(1, Math.ceil(delay / 1000)));
     setCounting(true);
   }, [status, ready, index, shotDeadlines]);
-  const capture = async (data: string) => {
+  const capture = async (
+    data: string,
+    frame: number,
+    capturedRound: string | null,
+  ) => {
+    const current = useRoomStore.getState();
+    const key = `${capturedRound}:${frame}`;
+    if (
+      !capturedRound ||
+      current.roundId !== capturedRound ||
+      current.status !== "capturing" ||
+      frame < 0 ||
+      frame >= current.shotDeadlines.length ||
+      capturedKeys.current.has(key)
+    )
+      return;
+    capturedKeys.current.add(key);
     setCounting(false);
     setFlashShot((n) => n + 1);
-    const frame = index;
-    const capturedRound = roundId;
-    setIndex((i) => i + 1);
+    setIndex((i) => Math.max(i, frame + 1));
     pending.current.push({ index: frame, data, roundId: capturedRound });
     try {
       if (!roomCode || !selfId) throw new Error("Session missing");
       await uploadCapture(roomCode, selfId, frame, data, capturedRound);
       if (roundRef.current === capturedRound) {
         pending.current = pending.current.filter((x) => x.index !== frame);
-        setUploaded((n) => n + 1);
+        uploadedFrames.current.add(frame);
+        setUploaded(uploadedFrames.current.size);
+        if (!pending.current.length) setError("");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
@@ -97,7 +121,9 @@ export default function CaptureRoom() {
           item.roundId,
         );
         pending.current = pending.current.filter((x) => x.index !== item.index);
-        setUploaded((n) => n + 1);
+        uploadedFrames.current.add(item.index);
+        setUploaded(uploadedFrames.current.size);
+        if (!pending.current.length) setError("");
       } catch (e) {
         setError(String(e));
         break;
@@ -185,7 +211,16 @@ export default function CaptureRoom() {
                 {ready ? "Camera ready" : "Connecting camera"}
               </span>
             </div>
-            <div className="capture-preview studio-camera-frame">
+            <div
+              className="capture-preview studio-camera-frame"
+              style={{
+                width: `min(100%, ${420 * cameraAspect}px)`,
+                aspectRatio: String(cameraAspect),
+                maxHeight: "none",
+                minHeight: 0,
+                marginInline: "auto",
+              }}
+            >
               {flashShot > 0 && (
                 <div
                   key={flashShot}
@@ -200,6 +235,9 @@ export default function CaptureRoom() {
                 isCountingDown={counting}
                 timerSeconds={remaining}
                 shotDeadline={shotDeadlines[index]}
+                frameIndex={index}
+                roundId={roundId}
+                captureAspectRatio={cameraAspect}
                 onCapture={capture}
                 onReady={onReady}
                 onError={setError}

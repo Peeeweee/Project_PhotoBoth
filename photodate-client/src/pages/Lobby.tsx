@@ -1,3 +1,4 @@
+import RoomChat from "../components/RoomChat";
 import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera, ArrowRight, Wifi, WifiOff } from "lucide-react";
@@ -155,6 +156,7 @@ export default function Lobby() {
             : "Your place is reserved while the room connects."}
         </p>
       )}
+      <RoomChat />
       <button
         onClick={leave}
         style={{

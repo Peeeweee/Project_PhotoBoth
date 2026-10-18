@@ -37,6 +37,10 @@ export type LayoutId =
   | "2x2" // 2 × 2 grid (group mode)
   | "3x1" // 3 frames stacked vertically
   | "4x1" // classic 4-strip
+  | "landscape-2"
+  | "landscape-3"
+  | "portrait-4"
+  | "group-wide"
   | "6x1"
   | "3x2"
   | "wide-1" // single wide panoramic
@@ -145,6 +149,10 @@ function shotCountFromLayout(id: LayoutId): number {
     "2x2": 4,
     "3x1": 3,
     "4x1": 4,
+    "landscape-2": 2,
+    "landscape-3": 3,
+    "portrait-4": 4,
+    "group-wide": 1,
     "6x1": 6,
     "3x2": 6,
     "wide-1": 1,

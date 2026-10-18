@@ -1,3 +1,5 @@
+import { suggestedPhotoOrder } from "../lib/photoOrder";
+import RoomChat from "../components/RoomChat";
 import { publishStage } from "../lib/session";
 import { composeCaptures } from "../lib/composeCaptures";
 import { useState, useEffect } from "react";
@@ -12,7 +14,8 @@ import { getCaptures } from "../lib/api";
 
 export default function EditorRoom() {
   const navigate = useNavigate();
-  const { roomCode, selfId, isHost } = useRoomStore();
+  const { roomCode, selfId, isHost, photoVotes, roundId, connectionStatus } =
+    useRoomStore();
   const {
     layoutId,
     designPreset,
@@ -33,6 +36,7 @@ export default function EditorRoom() {
     : Array<string | null>(layout.slotCount).fill(null);
   const setAssignedPhotos = (photos: (string | null)[]) =>
     setGlobalAssignedPhotos(photos.map((p) => p ?? ""));
+  const [voteError, setVoteError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -75,6 +79,25 @@ export default function EditorRoom() {
     }
   };
 
+  const vote = (
+    frameIndex: number,
+    selected: boolean,
+    position: number | null = null,
+  ) => {
+    if (!roomCode || !roundId) return;
+    setVoteError("");
+    socket
+      .timeout(8000)
+      .emit(
+        "vote-photo",
+        { code: roomCode, roundId, frameIndex, selected, position },
+        (timeout, ack) => {
+          if (timeout)
+            setVoteError("Your vote was not confirmed. Reload to check it.");
+          else if (!ack.ok) setVoteError(ack.error.message);
+        },
+      );
+  };
   const isComplete =
     assignedPhotos.length === layout.slotCount && assignedPhotos.every(Boolean);
 
@@ -162,34 +185,87 @@ export default function EditorRoom() {
               const used = assignedPhotos.filter(
                 (p) => p === capture.image_url,
               ).length;
+              const votes = photoVotes.filter(
+                (v) => v.frameIndex === capture.frame_index,
+              );
+              const mine = votes.find((v) => v.participantId === selfId);
               return (
-                <button
-                  key={capture.id}
-                  className={`shot-choice ${used ? "is-used" : ""}`}
-                  disabled={!isHost || isComplete}
-                  onClick={() => handleSelectThumbnail(capture.image_url)}
-                  aria-label={`Use photo ${idx + 1}${used ? `, used ${used} times` : ""}`}
-                >
-                  <img
-                    src={capture.image_url}
-                    alt={`Shot ${idx + 1}`}
-                    draggable={false}
-                  />
-                  <span className="shot-number">
-                    {String(idx + 1).padStart(2, "0")}
-                  </span>
-                  {used > 0 && (
-                    <span className="shot-used">
-                      <Check size={12} />
-                      {used > 1 ? used : ""}
+                <div key={capture.id} className="shot-tile">
+                  <button
+                    className={`shot-choice ${used ? "is-used" : ""}`}
+                    disabled={!isHost || isComplete}
+                    onClick={() => handleSelectThumbnail(capture.image_url)}
+                    aria-label={`Use photo ${idx + 1}${used ? `, used ${used} times` : ""}`}
+                  >
+                    <img
+                      src={capture.image_url}
+                      alt={`Shot ${idx + 1}`}
+                      draggable={false}
+                    />
+                    <span className="shot-number">
+                      {String(idx + 1).padStart(2, "0")}
                     </span>
-                  )}
-                </button>
+                    {used > 0 && (
+                      <span className="shot-used">
+                        <Check size={12} />
+                        {used > 1 ? used : ""}
+                      </span>
+                    )}
+                  </button>
+                  <div className="photo-vote-controls">
+                    <button
+                      aria-pressed={!!mine}
+                      aria-label={`Vote for photo ${idx + 1}`}
+                      disabled={connectionStatus !== "joined"}
+                      onClick={() => vote(capture.frame_index, !mine)}
+                    >
+                      ♡ {votes.length}
+                    </button>
+                    <select
+                      aria-label={`Suggest position for photo ${idx + 1}`}
+                      disabled={connectionStatus !== "joined"}
+                      value={mine?.position ?? ""}
+                      onChange={(e) =>
+                        vote(
+                          capture.frame_index,
+                          true,
+                          e.target.value === "" ? null : Number(e.target.value),
+                        )
+                      }
+                    >
+                      <option value="">Order…</option>
+                      {layout.slots.map((_, i) => (
+                        <option key={i} value={i}>
+                          Position {i + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               );
             })}
           </div>
           {isHost && (
             <div className="library-actions">
+              <button
+                className="action-secondary studio-wide"
+                disabled={!photoVotes.length}
+                onClick={() => {
+                  const ordered = suggestedPhotoOrder(
+                    captures,
+                    photoVotes,
+                    layout.slotCount,
+                  );
+                  setAssignedPhotos(
+                    Array.from(
+                      { length: layout.slotCount },
+                      (_, i) => ordered[i]?.image_url ?? "",
+                    ),
+                  );
+                }}
+              >
+                Apply crew votes
+              </button>
               <button
                 className="action-secondary studio-wide"
                 disabled={!captures.length || isComplete}
@@ -214,6 +290,12 @@ export default function EditorRoom() {
               </button>
             </div>
           )}
+          {voteError && (
+            <p className="studio-note" role="alert">
+              {voteError}
+            </p>
+          )}
+          <RoomChat />
         </aside>
         <div className="review-preview studio-card">
           <div className="studio-card-heading">

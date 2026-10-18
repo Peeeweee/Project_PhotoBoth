@@ -1,3 +1,5 @@
+import { getLayout } from "../data/stripLayouts";
+import { useSessionStore } from "../state/useSessionStore";
 import { useRoomStore } from "../state/useRoomStore";
 import type { GetCapturesResponse } from "./api";
 export async function composeCaptures(
@@ -37,29 +39,28 @@ export async function composeCaptures(
         ),
       );
       const canvas = document.createElement("canvas");
-      canvas.width = 1200;
-      canvas.height = 900;
+      const ratio = getLayout(
+        useSessionStore.getState().layoutId,
+      ).frameAspectRatio;
+      canvas.width = ratio >= 1 ? 1200 : Math.round(1200 * ratio);
+      canvas.height = ratio >= 1 ? Math.round(1200 / ratio) : 1200;
       const ctx = canvas.getContext("2d")!;
       ctx.fillStyle = "#111";
       ctx.fillRect(0, 0, 1200, 900);
       const columns = images.length > 2 ? 2 : images.length;
       const rows = Math.ceil(images.length / columns);
       images.forEach((img, i) => {
-        const w = 1200 / columns,
-          h = 900 / rows,
-          scale = Math.max(w / img.width, h / img.height),
-          sw = w / scale,
-          sh = h / scale;
+        const w = canvas.width / columns,
+          h = canvas.height / rows;
+        const scale = Math.min(w / img.width, h / img.height);
+        const dw = img.width * scale,
+          dh = img.height * scale;
         ctx.drawImage(
           img,
-          (img.width - sw) / 2,
-          (img.height - sh) / 2,
-          sw,
-          sh,
-          (i % columns) * w,
-          Math.floor(i / columns) * h,
-          w,
-          h,
+          (i % columns) * w + (w - dw) / 2,
+          Math.floor(i / columns) * h + (h - dh) / 2,
+          dw,
+          dh,
         );
       });
       return {

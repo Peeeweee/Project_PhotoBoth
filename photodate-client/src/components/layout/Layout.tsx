@@ -1,3 +1,4 @@
+import RoomClosed from "../RoomClosed";
 import { leaveSession } from "../../lib/session";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { LogOut, RefreshCw } from "lucide-react";
@@ -13,6 +14,7 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
+  const roomClosed = useRoomStore((s) => s.status === "closed");
   const themePack = useSessionStore((s) => s.themePack);
   const activeTheme = themePack
     ? (THEMES.find((t) => t.id === themePack.id) ?? DEFAULT_THEME)
@@ -66,10 +68,8 @@ export default function Layout({ children }: LayoutProps) {
       if (!isCurrent() || snapshot.room.id !== useRoomStore.getState().roomId)
         return;
       if (snapshot.room.status === "closed") {
-        useRoomStore.setState({ connectionStatus: "error" });
-        setConnectionError(
-          "This room has closed. Return home to create or join another room.",
-        );
+        setConnectionError("");
+        route("closed");
       } else if (
         !snapshot.participants.some((person) => person.id === selfId)
       ) {
@@ -113,6 +113,8 @@ export default function Layout({ children }: LayoutProps) {
         readyParticipantIds: snapshot.readyParticipantIds,
         approvedParticipantIds: snapshot.approvedParticipantIds ?? [],
         stage: snapshot.stage,
+        messages: snapshot.messages ?? [],
+        photoVotes: snapshot.photoVotes ?? [],
       });
       const hasPendingEdit =
         previous.isHost &&
@@ -161,6 +163,12 @@ export default function Layout({ children }: LayoutProps) {
         (ack) => {
           if (!isCurrent()) return;
           if (!ack.ok) {
+            if (ack.error.code === "HTTP_410") {
+              useRoomStore.setState({ status: "closed" });
+              setConnectionError("");
+              route("closed");
+              return;
+            }
             useRoomStore.setState({ connectionStatus: "error" });
             setConnectionError(ack.error.message);
             return;
@@ -245,6 +253,19 @@ export default function Layout({ children }: LayoutProps) {
         );
       }, 250);
     });
+    const collaboration = (
+      value: import("../../../../shared/contracts").CollaborationState,
+    ) => {
+      if (isCurrent() && value.roomId === useRoomStore.getState().roomId)
+        useRoomStore.setState({
+          messages: value.messages,
+          photoVotes:
+            value.roundId === useRoomStore.getState().roundId
+              ? value.photoVotes
+              : [],
+        });
+    };
+    socket.on("collaboration-changed", collaboration);
     socket.on("connect", join);
     socket.on("disconnect", disconnected);
     socket.on("connect_error", connectionFailed);
@@ -256,6 +277,7 @@ export default function Layout({ children }: LayoutProps) {
       active = false;
       clearTimeout(debounce);
       unsubscribe();
+      socket.off("collaboration-changed", collaboration);
       socket.off("connect", join);
       socket.off("disconnect", disconnected);
       socket.off("connect_error", connectionFailed);
@@ -384,7 +406,7 @@ export default function Layout({ children }: LayoutProps) {
           transition: "background var(--dur-slow)",
         }}
       >
-        {connectionStatus !== "joined" && roomCode && (
+        {!roomClosed && connectionStatus !== "joined" && roomCode && (
           <div
             style={{
               position: "absolute",
@@ -415,7 +437,7 @@ export default function Layout({ children }: LayoutProps) {
                 : "Connecting to the server…"}
           </div>
         )}
-        {connectionError && (
+        {!roomClosed && connectionError && (
           <div
             role="alert"
             style={{ padding: 16, marginTop: 40, color: "var(--c-error)" }}
@@ -445,7 +467,7 @@ export default function Layout({ children }: LayoutProps) {
             )}
           </div>
         )}
-        {children}
+        {roomClosed ? <RoomClosed /> : children}
       </main>
     </div>
   );

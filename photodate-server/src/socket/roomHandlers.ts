@@ -196,6 +196,79 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     save(room.id, d);
     changed(room.id);
   });
+  const publishCollaboration = (roomId: string) => {
+    const d = document(roomId);
+    io.to(roomId).emit("collaboration-changed", {
+      roomId,
+      messages: d.messages,
+      photoVotes: d.photoVotes,
+      roundId: d.roundId,
+    });
+  };
+  bind("send-message", (p) => {
+    const { room, participant } = member(p);
+    rate(`chat:${participant.id}`, 20);
+    assert(
+      typeof p.text === "string" &&
+        p.text.trim().length > 0 &&
+        p.text.length <= 500,
+      "Messages must contain 1–500 characters",
+    );
+    const d = document(room.id);
+    d.messages.push({
+      id: randomUUID(),
+      participantId: participant.id,
+      displayName: participant.display_name,
+      text: p.text.trim(),
+      sentAt: Date.now(),
+    });
+    d.messages = d.messages.slice(-50);
+    save(room.id, d);
+    publishCollaboration(room.id);
+  });
+  bind("vote-photo", (p) => {
+    const { room, participant } = member(p);
+    rate(`vote:${participant.id}`, 60);
+    const d = document(room.id);
+    assert(
+      ["reviewing", "editing", "exporting"].includes(room.status) &&
+        p.roundId === d.roundId,
+      "Photo voting is unavailable for this round",
+      409,
+    );
+    assert(
+      Number.isInteger(p.frameIndex) &&
+        p.frameIndex >= 0 &&
+        p.frameIndex < d.frameCount &&
+        captureQueries
+          .metadataByRoom(room.id)
+          .some(
+            (c) => c.round_id === d.roundId && c.frame_index === p.frameIndex,
+          ),
+      "Unknown photo",
+    );
+    assert(typeof p.selected === "boolean", "Invalid vote");
+    assert(
+      p.position === undefined ||
+        p.position === null ||
+        (Number.isInteger(p.position) &&
+          p.position >= 0 &&
+          p.position < d.frameCount),
+      "Invalid photo position",
+    );
+    d.photoVotes = d.photoVotes.filter(
+      (v) =>
+        !(v.participantId === participant.id && v.frameIndex === p.frameIndex),
+    );
+    if (p.selected)
+      d.photoVotes.push({
+        participantId: participant.id,
+        frameIndex: p.frameIndex,
+        position: p.position ?? null,
+      });
+    save(room.id, d);
+    publishCollaboration(room.id);
+  });
   bind("capture-ready", (p) => {
     const { room, participant } = member(p);
     assert(typeof p.ready === "boolean", "ready must be boolean");
@@ -246,6 +319,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
         Number.isInteger(n) && n >= 1 && n <= 12,
         "frameCount must be 1–12",
       );
+      d.photoVotes = [];
       d.roundId = randomUUID();
       d.frameCount = n;
       d.shotDeadlines = Array.from(
@@ -275,6 +349,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     if (p.status === "ready") {
       d.stage = "capture";
       d.roundId = null;
+      d.photoVotes = [];
       d.readyParticipantIds = [];
       d.approvedParticipantIds = [];
       d.expectedParticipantIds = [];
@@ -283,6 +358,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     }
     if (p.status === "waiting") {
       d.roundId = null;
+      d.photoVotes = [];
       d.readyParticipantIds = [];
       d.approvedParticipantIds = [];
       d.expectedParticipantIds = [];

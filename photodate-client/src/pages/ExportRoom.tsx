@@ -1,3 +1,4 @@
+import { waitForExport } from "../lib/exportReady";
 import { publishStage } from "../lib/session";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -11,19 +12,6 @@ import {
 import { STICKERS } from "../data/stickerPresets";
 import { FILTER_PRESETS } from "../data/filterPresets";
 
-async function waitForExport(node: HTMLElement) {
-  const started = Date.now();
-  while (node.dataset.exportReady !== "true") {
-    if (Date.now() - started > 10000)
-      throw new Error("Your photos are still rendering. Please retry.");
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  await Promise.all(
-    Array.from(node.querySelectorAll("img")).map((img) => img.decode()),
-  );
-  if (!node.offsetWidth)
-    throw new Error("Strip preview is not visible. Please retry.");
-}
 export default function ExportRoom() {
   const navigate = useNavigate();
   const { isHost } = useRoomStore();

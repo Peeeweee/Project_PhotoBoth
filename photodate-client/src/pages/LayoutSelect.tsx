@@ -96,7 +96,7 @@ export default function LayoutSelect() {
               lineHeight: "var(--lh-relaxed)",
             }}
           >
-            Eight ways to keep the moment. Choose a quick duo, a classic strip,
+            Twelve ways to keep the moment. Choose a quick duo, a classic strip,
             or a whole memory sheet.
           </p>
         </motion.div>

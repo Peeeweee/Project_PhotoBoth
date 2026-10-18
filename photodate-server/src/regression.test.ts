@@ -128,6 +128,24 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
       ).ok,
       true,
     );
+    assert.equal(
+      (await ack(gs, "send-message", { code, text: "Let’s use photo 1!" })).ok,
+      true,
+    );
+    assert.equal(
+      (await ack(gs, "send-message", { code, text: "x".repeat(501) })).ok,
+      false,
+    );
+    assert.equal(
+      (
+        await ack(gs, "send-message", {
+          code,
+          participantId: host.hostId,
+          text: "Fake host",
+        })
+      ).ok,
+      false,
+    );
     for (const s of [hs, gs])
       assert.equal(
         (await ack(s, "capture-ready", { code, ready: true })).ok,
@@ -254,6 +272,87 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
     assert.equal(state.room.status, "reviewing");
     assert.equal(state.captures.length, 2);
     assert.equal(
+      (
+        await ack(gs, "vote-photo", {
+          code,
+          roundId: round,
+          frameIndex: 0,
+          selected: true,
+          position: 0,
+        })
+      ).ok,
+      true,
+    );
+    await ack(gs, "vote-photo", {
+      code,
+      roundId: round,
+      frameIndex: 0,
+      selected: true,
+      position: 0,
+    });
+    assert.equal(document(host.roomId).photoVotes.length, 1);
+    assert.equal(
+      (
+        await ack(gs, "vote-photo", {
+          code,
+          roundId: "stale",
+          frameIndex: 0,
+          selected: true,
+        })
+      ).ok,
+      false,
+    );
+    assert.equal(
+      (
+        await ack(gs, "vote-photo", {
+          code,
+          roundId: round,
+          frameIndex: 99,
+          selected: true,
+        })
+      ).ok,
+      false,
+    );
+    assert.equal(
+      (
+        await ack(gs, "vote-photo", {
+          code,
+          roundId: round,
+          frameIndex: 0,
+          selected: true,
+          position: 99,
+        })
+      ).ok,
+      false,
+    );
+    assert.equal(
+      (
+        await ack(gs, "vote-photo", {
+          code,
+          participantId: host.hostId,
+          roundId: round,
+          frameIndex: 0,
+          selected: true,
+        })
+      ).ok,
+      false,
+    );
+    await ack(gs, "vote-photo", {
+      code,
+      roundId: round,
+      frameIndex: 0,
+      selected: false,
+    });
+    assert.equal(document(host.roomId).photoVotes.length, 0);
+    await ack(gs, "vote-photo", {
+      code,
+      roundId: round,
+      frameIndex: 0,
+      selected: true,
+      position: 0,
+    });
+
+    assert.equal(
       (await ack(gs, "update-editor", { code, editor: { title: "Attack" } }))
         .ok,
       false,
@@ -308,6 +407,8 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
       false,
     );
     assert.equal(restored.snapshot.stage, "filter");
+    assert.equal(restored.snapshot.messages[0].text, "Let’s use photo 1!");
+    assert.equal(restored.snapshot.photoVotes.length, 1);
     await ack(gs, "capture-ready", { code, ready: false });
     const retake = await ack(hs, "update-room-state", {
       code,
@@ -326,6 +427,7 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
     assert.equal(retry.ok, true);
     assert.notEqual(retry.snapshot.roundId, round);
     assert.equal(retry.snapshot.captures.length, 0);
+    assert.equal(retry.snapshot.photoVotes.length, 0);
     assert.equal(
       (await request(`/rooms/${code}/captures`, upload, host.sessionToken))
         .status,

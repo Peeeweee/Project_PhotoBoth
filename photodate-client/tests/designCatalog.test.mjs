@@ -33,9 +33,9 @@ const {
 } = require("../../photodate-server/dist/runtime.js");
 const { default: db } = require("../../photodate-server/dist/db.js");
 after(() => db.close());
-test("all eight layouts have unique identities, valid slot geometry and server support", () => {
-  assert.equal(AVAILABLE_LAYOUTS.length, 8);
-  assert.equal(new Set(AVAILABLE_LAYOUTS.map((l) => l.id)).size, 8);
+test("all twelve layouts have unique identities, valid slot geometry and server support", () => {
+  assert.equal(AVAILABLE_LAYOUTS.length, 12);
+  assert.equal(new Set(AVAILABLE_LAYOUTS.map((l) => l.id)).size, 12);
   for (const l of AVAILABLE_LAYOUTS) {
     assert.ok(layouts.includes(l.id), l.id);
     assert.equal(getLayout(l.id).id, l.id);
