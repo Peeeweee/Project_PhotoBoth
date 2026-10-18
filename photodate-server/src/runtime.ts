@@ -266,6 +266,7 @@ export function rate(key: string, limit = 120) {
     for (const [k, v] of buckets) if (v.until < now) buckets.delete(k);
 }
 export const layouts = [
+  "custom",
   "portrait-pair",
   "landscape-film",
   "mixed-story",
@@ -390,10 +391,13 @@ export function editorDocument(value: unknown) {
     "drawStrokes",
     "stripTitle",
     "titlePosition",
+    "titleStyle",
+    "textLayers",
     "filterId",
     "showWatermark",
     "designPreset",
     "layoutId",
+    "customLayout",
     "title",
   ];
   assert(
@@ -411,10 +415,15 @@ export function editorDocument(value: unknown) {
   }
   if (e.designPreset !== undefined)
     out.designPreset = e.designPreset === null ? null : design(e.designPreset);
+  if (e.customLayout !== undefined)
+    out.customLayout =
+      e.customLayout === null ? null : customLayout(e.customLayout);
   if (e.layoutId !== undefined) {
     assert(layouts.includes(e.layoutId), "Unknown layout");
     out.layoutId = e.layoutId;
   }
+  if (e.layoutId === "custom")
+    assert(out.customLayout, "Custom frame positions are required");
   if (e.filterId !== undefined) {
     assert(
       [
@@ -429,6 +438,35 @@ export function editorDocument(value: unknown) {
       "Unknown filter",
     );
     out.filterId = e.filterId;
+  }
+  if (e.titleStyle !== undefined)
+    out.titleStyle = validateTextStyle(e.titleStyle);
+  if (e.textLayers !== undefined) {
+    assert(
+      Array.isArray(e.textLayers) && e.textLayers.length <= 12,
+      "Use at most 12 text layers",
+    );
+    const ids = new Set<string>();
+    out.textLayers = e.textLayers.map((raw: unknown) => {
+      const layer = object(raw);
+      assert(
+        typeof layer.id === "string" &&
+          /^[a-zA-Z0-9-]{1,100}$/.test(layer.id) &&
+          !ids.has(layer.id),
+        "Invalid or duplicate text identity",
+      );
+      ids.add(layer.id);
+      return {
+        id: layer.id,
+        text: text(layer.text, 200),
+        x: num(layer.x, 5, 95),
+        y: num(layer.y, 5, 95),
+        width: num(layer.width, 10, 90),
+        fontSize: num(layer.fontSize, 8, 240),
+        rotation: num(layer.rotation, -180, 180),
+        style: validateTextStyle(layer.style),
+      };
+    });
   }
   if (e.titlePosition !== undefined) {
     const position = object(e.titlePosition);
@@ -611,4 +649,65 @@ export function recoverPresence() {
     }
   }).immediate();
   reclaimExpiredParticipants();
+}
+
+export function customLayout(value: unknown) {
+  const v = object(value);
+  const aspectRatio = num(v.aspectRatio, 0.5, 2);
+  assert(
+    Array.isArray(v.frames) && v.frames.length >= 1 && v.frames.length <= 12,
+    "Choose 1–12 custom frames",
+  );
+  const frames = v.frames.map((raw: unknown) => {
+    const f = object(raw);
+    const x = num(f.x, 0, 100),
+      y = num(f.y, 0, 90),
+      width = num(f.width, 1, 90),
+      height = num(f.height, 1, 85),
+      rotation = num(f.rotation, -90, 90);
+    const angle = (rotation * Math.PI) / 180;
+    const halfW =
+      (Math.abs(Math.cos(angle)) * width +
+        Math.abs(Math.sin(angle)) * height * aspectRatio) /
+      2;
+    const halfH =
+      ((Math.abs(Math.sin(angle)) * width) / aspectRatio +
+        Math.abs(Math.cos(angle)) * height) /
+      2;
+    assert(
+      x + width / 2 - halfW >= -0.01 &&
+        x + width / 2 + halfW <= 100.01 &&
+        y + height / 2 - halfH >= -0.01 &&
+        y + height / 2 + halfH <= 90.01,
+      "Keep rotated frames inside the canvas and above the caption",
+    );
+    return { x, y, width, height, rotation };
+  });
+  return { aspectRatio, frames };
+}
+
+export function validateTextStyle(value: unknown) {
+  const style = object(value);
+  assert(
+    ["typewriter", "modern", "elegant", "handwritten", "rounded"].includes(
+      style.font,
+    ),
+    "Choose a supported title font",
+  );
+  assert(
+    style.color === "auto" ||
+      (typeof style.color === "string" && /^#[0-9a-f]{6}$/i.test(style.color)),
+    "Choose a valid title color",
+  );
+  assert(
+    typeof style.bold === "boolean" && typeof style.italic === "boolean",
+    "Invalid text emphasis",
+  );
+  return {
+    font: style.font,
+    size: num(style.size, 0.6, 1.6),
+    color: style.color,
+    bold: style.bold,
+    italic: style.italic,
+  };
 }
