@@ -1,3 +1,4 @@
+import QrInvite from "../components/lobby/QrInvite";
 import RoomChat from "../components/RoomChat";
 import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -108,6 +109,7 @@ export default function Lobby() {
         </span>
         <CodeTiles code={roomCode} />
         <CopyLinkButton code={roomCode} />
+        <QrInvite code={roomCode} />
       </div>
       <p role="status" style={{ textAlign: "center", margin: 0 }}>
         {participants.length}/4 joined · {onlineCount} online
