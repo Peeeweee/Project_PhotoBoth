@@ -1,3 +1,4 @@
+import RestartRoundDialog from "../components/capture/RestartRoundDialog";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { socket } from "../lib/socket";
 import { uploadCapture } from "../lib/api";
@@ -31,6 +32,7 @@ export default function CaptureRoom() {
   } = useRoomStore();
   const { timerMode, shotCount, layoutId, designPreset, stripTitle } =
     useSessionStore();
+  const [restartRound, setRestartRound] = useState<string | null>(null);
   const [localShots, setLocalShots] = useState<string[]>([]);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [liveCount, setLiveCount] = useState<number | null>(null);
@@ -48,7 +50,8 @@ export default function CaptureRoom() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [index, setIndex] = useState(0);
-  const layout = getLayout(layoutId);
+  const customLayout = useSessionStore((s) => s.customLayout);
+  const layout = getLayout(layoutId, customLayout);
   const automaticAspect =
     (slotAspectRatio(layout, Math.min(index, layout.slotCount - 1)) * rows) /
     columns;
@@ -216,8 +219,35 @@ export default function CaptureRoom() {
   };
   return (
     <section
-      className={`studio-page capture-studio${layout.stripAspectRatio >= 1 ? " has-wide-keepsake" : ""}`}
+      className={`studio-page capture-studio${layout.stripAspectRatio >= 1 ? " has-wide-keepsake" : ""}${activeCapture ? " is-shooting" : ""}`}
     >
+      {activeCapture && (
+        <div className="shoot-session-heading">
+          <div className="shoot-session-title">
+            <span className="shoot-recording">
+              <i />{" "}
+              {index >= shotDeadlines.length
+                ? "SAVING YOUR MOMENTS"
+                : "PHOTO DATE · LIVE"}
+            </span>
+            <h1>
+              {index >= shotDeadlines.length
+                ? "That’s a wrap."
+                : "This is your moment."}
+            </h1>
+          </div>
+          <div className="shoot-take-counter">
+            <span>TAKE</span>
+            <strong>
+              {String(Math.min(index + 1, shotDeadlines.length)).padStart(
+                2,
+                "0",
+              )}
+              <small> / {String(shotDeadlines.length).padStart(2, "0")}</small>
+            </strong>
+          </div>
+        </div>
+      )}
       <header className="studio-heading">
         <div>
           <span className="studio-eyebrow">
@@ -323,6 +353,20 @@ export default function CaptureRoom() {
                 photo; the chosen strip stays the same and fits the result.
               </p>
             </div>
+            {activeCapture && (
+              <div className="shoot-viewfinder-bar">
+                <span>
+                  <i /> YOUR VIEWFINDER
+                </span>
+                <span>
+                  {orientation === "auto"
+                    ? "Auto framing"
+                    : orientation === "portrait"
+                      ? "Portrait"
+                      : "Landscape"}
+                </span>
+              </div>
+            )}
             <div className="camera-stage">
               <div
                 className="capture-preview studio-camera-frame"
@@ -334,6 +378,14 @@ export default function CaptureRoom() {
                   marginInline: "auto",
                 }}
               >
+                {activeCapture && (
+                  <div className="shoot-viewfinder-guides" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                )}
                 {flashShot > 0 && (
                   <div
                     key={flashShot}
@@ -364,6 +416,25 @@ export default function CaptureRoom() {
                 />
               </div>
             </div>
+            {activeCapture && (
+              <div className="shoot-pose-cue" role="status">
+                <strong>
+                  {index >= shotDeadlines.length
+                    ? "Lovely. Bringing everyone’s photos together…"
+                    : [
+                        "Find your light. Give us a little smile.",
+                        "A new pose. A little more you.",
+                        "Keep the good energy going.",
+                        "One more memory to keep.",
+                      ][index % 4]}
+                </strong>
+                <span>
+                  {index >= shotDeadlines.length
+                    ? "Keep this tab open while uploads finish."
+                    : "Follow the countdown. We’ll take care of the rest."}
+                </span>
+              </div>
+            )}
             <div className="camera-card-caption">
               <span className="live-dot" />
               {participants.length > 1
@@ -384,6 +455,27 @@ export default function CaptureRoom() {
                   : `${timerMode}s between shots`}
               </span>
             </div>
+            {activeCapture && (
+              <div
+                className="shoot-contact-roll"
+                aria-label="Photos from this round"
+              >
+                {Array.from({ length: shotDeadlines.length }, (_, i) => (
+                  <div
+                    key={i}
+                    className={`shoot-contact-frame${i < completedShots ? " is-taken" : i === index ? " is-next" : ""}`}
+                    aria-label={`Photo ${i + 1}: ${i < completedShots ? "taken" : i === index ? "up next" : "waiting"}`}
+                  >
+                    {localShots[i] ? (
+                      <img src={localShots[i]} alt={`Your shot ${i + 1}`} />
+                    ) : (
+                      <span>{String(i + 1).padStart(2, "0")}</span>
+                    )}
+                    {i < completedShots && <Check size={11} />}
+                  </div>
+                ))}
+              </div>
+            )}
             <ol>
               {Array.from(
                 { length: activeCapture ? shotDeadlines.length : shotCount },
@@ -412,7 +504,7 @@ export default function CaptureRoom() {
             aria-label="Your strip taking shape"
           >
             <div className="studio-card-heading">
-              <span>✦ The keepsake</span>
+              <span>{activeCapture ? "YOUR PRINT" : "✦ The keepsake"}</span>
               <span className="studio-pill" aria-live="polite">
                 {index < shotCount
                   ? `${index + 1} / ${shotCount}`
@@ -448,7 +540,7 @@ export default function CaptureRoom() {
                   index < shotCount ? (
                     <LiveSlot
                       stream={cameraStream}
-                      count={liveCount}
+                      count={activeCapture ? null : liveCount}
                       mirrored={cameraMirrored}
                     />
                   ) : null
@@ -640,16 +732,7 @@ export default function CaptureRoom() {
             <div className="round-recovery">
               <button
                 className="action-secondary studio-wide"
-                onClick={() => {
-                  if (roomCode)
-                    socket.emit(
-                      "update-room-state",
-                      { code: roomCode, status: "ready" },
-                      (ack) => {
-                        if (!ack.ok) setError(ack.error.message);
-                      },
-                    );
-                }}
+                onClick={() => setRestartRound(roundId)}
               >
                 Restart this round
               </button>
@@ -661,6 +744,12 @@ export default function CaptureRoom() {
           )}
         </aside>
       </div>
+      {restartRound && restartRound === roundId && activeCapture && (
+        <RestartRoundDialog
+          roundId={restartRound}
+          onClose={() => setRestartRound(null)}
+        />
+      )}
     </section>
   );
 }
