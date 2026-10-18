@@ -40,6 +40,13 @@ const transitions: Record<string, string[]> = {
   editing: ["exporting", "capturing", "waiting", "ready"],
   exporting: ["closed", "capturing", "waiting", "ready"],
 };
+function keepsakeStyle(editor: Record<string, unknown>) {
+  return Object.fromEntries(
+    ["stripTitle", "titleStyle", "titlePosition", "filterId"]
+      .filter((key) => editor[key] !== undefined)
+      .map((key) => [key, editor[key]]),
+  );
+}
 export function registerRoomHandlers(io: Server, socket: Socket) {
   const publish = (id: string) => {
     const s = snapshot(id, false);
@@ -312,6 +319,63 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     save(room.id, d);
     changed(room.id);
   });
+  bind("prepare-retake", (p) => {
+    const { room } = member(p, true),
+      d = document(room.id);
+    assert(
+      ["reviewing", "editing", "exporting"].includes(room.status),
+      "Finish the current shots before requesting a retake",
+      409,
+    );
+    assert(p.roundId === d.roundId && d.roundId, "Stale capture round", 409);
+    assert(
+      Number.isInteger(p.frameIndex) &&
+        p.frameIndex >= 0 &&
+        p.frameIndex < d.frameCount,
+      "Invalid retake frame",
+    );
+    assert(
+      Array.isArray(p.slotIndexes) &&
+        p.slotIndexes.length <= 12 &&
+        p.slotIndexes.every(
+          (i: unknown) =>
+            Number.isInteger(i) && Number(i) >= 0 && Number(i) < d.frameCount,
+        ),
+      "Invalid retake assignments",
+    );
+    if (p.editor !== undefined) {
+      const editor = editorDocument(p.editor);
+      assert(
+        JSON.stringify(editor).length <= 6000000,
+        "Editor document too large",
+        413,
+      );
+      d.editor = editor;
+    }
+    const photos = Array.isArray(d.editor.assignedPhotos)
+      ? (d.editor.assignedPhotos as string[])
+      : [];
+    const sources = Array.isArray(d.editor.photoSources)
+      ? [...(d.editor.photoSources as (number | null)[])]
+      : Array(photos.length).fill(null);
+    p.slotIndexes.forEach((i: number) => {
+      photos[i] = "";
+      sources[i] = p.frameIndex;
+    });
+    d.editor.assignedPhotos = photos;
+    d.editor.photoSources = sources;
+    d.retakeFrameIndex = p.frameIndex;
+    d.readyParticipantIds = [];
+    d.approvedParticipantIds = [];
+    d.reviewApprovals = [];
+    d.reviewRevision = "";
+    d.shotDeadlines = [];
+    d.stage = "capture";
+    save(room.id, d);
+    roomQueries.setStatus(room.id, "ready");
+    changed(room.id);
+    return { snapshot: snapshot(room.id) };
+  });
   bind("update-room-state", (p) => {
     const { room } = member(p, true);
     assert(
@@ -347,6 +411,12 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
         Number.isInteger(n) && n >= 1 && n <= 12,
         "frameCount must be 1–12",
       );
+      if (d.retakeFrameIndex !== null)
+        assert(
+          n === d.frameCount,
+          "A retake must keep the original shot count",
+          409,
+        );
       if (room.layout_id === "custom") {
         const shape = customLayout(d.editor.customLayout);
         assert(
@@ -357,21 +427,37 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       d.photoVotes = [];
       d.reviewApprovals = [];
       d.reviewRevision = "";
+      const previousRound = d.roundId;
       d.roundId = randomUUID();
       d.frameCount = n;
-      d.shotDeadlines = Array.from(
-        { length: n },
-        (_, i) =>
-          Date.now() + 1500 + (i + 1) * Math.max(1, room.timer_seconds) * 1000,
+      d.shotDeadlines = Array.from({ length: n }, (_, i) =>
+        d.retakeFrameIndex !== null
+          ? i === d.retakeFrameIndex
+            ? Date.now() + 1500 + Math.max(1, room.timer_seconds) * 1000
+            : 0
+          : Date.now() +
+            1500 +
+            (i + 1) * Math.max(1, room.timer_seconds) * 1000,
       );
       d.expectedParticipantIds = people.map((p) => p.id);
-      d.editor = {
-        ...(d.customDesign ? { designPreset: d.customDesign } : {}),
-        layoutId: room.layout_id,
-        customLayout: d.editor.customLayout ?? null,
-      };
+      if (d.retakeFrameIndex !== null) {
+        assert(previousRound, "No photos to retake", 409);
+        captureQueries.retakeRound(
+          room.id,
+          previousRound,
+          d.roundId,
+          d.retakeFrameIndex,
+        );
+      } else {
+        d.editor = {
+          ...keepsakeStyle(d.editor),
+          ...(d.customDesign ? { designPreset: d.customDesign } : {}),
+          layoutId: room.layout_id,
+          customLayout: d.editor.customLayout ?? null,
+        };
+        captureQueries.deleteByRoom(room.id);
+      }
       d.stage = "capture";
-      captureQueries.deleteByRoom(room.id);
     }
     if (p.status === "reviewing") {
       const rows = captureQueries.findByRoom(room.id);
@@ -388,6 +474,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       d.stage = "review";
     }
     if (p.status === "ready") {
+      d.retakeFrameIndex = null;
       d.reviewApprovals = [];
       d.reviewRevision = "";
       d.stage = "capture";
@@ -398,6 +485,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       d.approvedParticipantIds = [];
       d.expectedParticipantIds = [];
       d.editor = {
+        ...keepsakeStyle(d.editor),
         ...(d.customDesign ? { designPreset: d.customDesign } : {}),
         layoutId: room.layout_id,
         customLayout: d.editor.customLayout ?? null,
@@ -405,6 +493,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       captureQueries.deleteByRoom(room.id);
     }
     if (p.status === "waiting") {
+      d.retakeFrameIndex = null;
       d.reviewApprovals = [];
       d.reviewRevision = "";
       d.roundId = null;
@@ -485,6 +574,8 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     if (p.layoutId === "custom")
       d.editor.customLayout = customLayout(p.customLayout);
     else d.editor.customLayout = null;
+    if (p.keepsakeStyle !== undefined)
+      Object.assign(d.editor, keepsakeStyle(editorDocument(p.keepsakeStyle)));
     d.editor.layoutId = p.layoutId;
     if (p.customDesign) {
       const custom = design(p.customDesign);
@@ -536,7 +627,9 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
         JSON.stringify(editor.assignedPhotos ?? []) ||
       d.editor.layoutId !== editor.layoutId ||
       JSON.stringify(d.editor.customLayout) !==
-        JSON.stringify(editor.customLayout);
+        JSON.stringify(editor.customLayout) ||
+      JSON.stringify(d.editor.photoEdits ?? []) !==
+        JSON.stringify(editor.photoEdits ?? []);
     if (
       (room.status === "reviewing" || d.stage === "editor") &&
       stage !== "editor"

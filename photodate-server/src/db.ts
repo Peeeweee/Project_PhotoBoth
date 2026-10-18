@@ -176,6 +176,22 @@ export const captureQueries = {
         "SELECT * FROM captures WHERE room_id=? ORDER BY frame_index,participant_id",
       )
       .all(id) as Capture[],
+  retakeRound: (
+    roomId: string,
+    oldRound: string,
+    newRound: string,
+    frame: number,
+  ) =>
+    db
+      .transaction(() => {
+        db.prepare(
+          "UPDATE captures SET round_id=? WHERE room_id=? AND round_id=?",
+        ).run(newRound, roomId, oldRound);
+        db.prepare(
+          "DELETE FROM captures WHERE room_id=? AND round_id=? AND frame_index=?",
+        ).run(roomId, newRound, frame);
+      })
+      .immediate(),
   deleteByRoom: (id: string) =>
     db.prepare("DELETE FROM captures WHERE room_id=?").run(id),
 };

@@ -122,6 +122,11 @@ router.post("/:code/join", (req, res) => {
         "Session has already started",
         409,
       );
+      assert(
+        document(room.id).retakeFrameIndex === null,
+        "A retake is in progress. Wait for the crew to finish.",
+        409,
+      );
       const slot = participantQueries.nextSlot(room.id);
       assert(slot !== null, "Room is full", 409);
       const id = randomUUID();
@@ -174,6 +179,16 @@ router.post("/:code/captures", (req, res) => {
   assert(
     Date.now() + 250 >= d.shotDeadlines[b.frameIndex],
     "Shot deadline has not arrived",
+    409,
+  );
+  assert(
+    d.retakeFrameIndex === null || b.frameIndex === d.retakeFrameIndex,
+    "Only the selected shot can be retaken",
+    409,
+  );
+  assert(
+    d.shotDeadlines[b.frameIndex] > 0,
+    "This frame is not scheduled for this round",
     409,
   );
   const image = validateImage(b.dataUrl);

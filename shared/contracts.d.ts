@@ -65,6 +65,7 @@ export interface RoomSnapshot<Editor extends object = Record<string, unknown>> {
   stage: string;
   roundId: string | null;
   frameCount: number;
+  retakeFrameIndex?: number | null;
   messages: RoomMessage[];
   photoVotes: PhotoVote[];
   shotDeadlines: number[];
@@ -116,6 +117,15 @@ export interface ClientToServerEvents<
     payload: Member & { reason?: string },
     ack: Ack<Editor>,
   ) => void;
+  "prepare-retake": (
+    payload: Member & {
+      roundId: string;
+      frameIndex: number;
+      slotIndexes: number[];
+      editor?: Editor;
+    },
+    ack: Ack<Editor>,
+  ) => void;
   "review-approval": (
     payload: Member & { revision: string; approved: boolean },
     ack: Ack<Editor>,
@@ -142,6 +152,7 @@ export interface ClientToServerEvents<
       designId: string | null;
       customDesign?: unknown;
       customLayout?: unknown;
+      keepsakeStyle?: unknown;
     },
     ack: Ack<Editor>,
   ) => void;
@@ -245,4 +256,11 @@ export interface TextLayer {
   fontSize: number;
   rotation: number;
   style: TitleStyle;
+}
+
+export interface PhotoEdit {
+  fit: "contain" | "cover";
+  zoom: number;
+  x: number;
+  y: number;
 }

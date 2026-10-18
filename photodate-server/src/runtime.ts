@@ -81,6 +81,7 @@ export interface Document {
   stage: string;
   roundId: string | null;
   frameCount: number;
+  retakeFrameIndex: number | null;
   messages: RoomMessage[];
   photoVotes: PhotoVote[];
   reviewApprovals: string[];
@@ -106,6 +107,7 @@ export function document(roomId: string): Document {
     stage: "editor",
     roundId: null,
     frameCount: 4,
+    retakeFrameIndex: null,
     messages: [],
     photoVotes: [],
     reviewApprovals: [],
@@ -167,6 +169,7 @@ export function complete(roomId: string) {
   ) {
     roomQueries.setStatus(roomId, "reviewing");
     d.stage = "editor";
+    d.retakeFrameIndex = null;
     save(roomId, d);
   }
   changed(roomId);
@@ -393,6 +396,8 @@ export function editorDocument(value: unknown) {
     "titlePosition",
     "titleStyle",
     "textLayers",
+    "photoEdits",
+    "photoSources",
     "filterId",
     "showWatermark",
     "designPreset",
@@ -438,6 +443,37 @@ export function editorDocument(value: unknown) {
       "Unknown filter",
     );
     out.filterId = e.filterId;
+  }
+  if (e.photoEdits !== undefined) {
+    assert(
+      Array.isArray(e.photoEdits) && e.photoEdits.length <= 12,
+      "Too many photo adjustments",
+    );
+    out.photoEdits = e.photoEdits.map((raw: unknown) => {
+      const edit = object(raw);
+      assert(["contain", "cover"].includes(edit.fit), "Invalid photo fitting");
+      return {
+        fit: edit.fit,
+        zoom: num(edit.zoom, 1, 3),
+        x: num(edit.x, -50, 50),
+        y: num(edit.y, -50, 50),
+      };
+    });
+  }
+  if (e.photoSources !== undefined) {
+    assert(
+      Array.isArray(e.photoSources) && e.photoSources.length <= 12,
+      "Invalid photo sources",
+    );
+    assert(
+      e.photoSources.every(
+        (v: unknown) =>
+          v === null ||
+          (Number.isInteger(v) && Number(v) >= 0 && Number(v) < 12),
+      ),
+      "Invalid source frame",
+    );
+    out.photoSources = e.photoSources;
   }
   if (e.titleStyle !== undefined)
     out.titleStyle = validateTextStyle(e.titleStyle);
