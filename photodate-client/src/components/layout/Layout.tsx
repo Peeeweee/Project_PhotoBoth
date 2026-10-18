@@ -1,4 +1,6 @@
 import RoomClosed from "../RoomClosed";
+import BrandAtmosphere from "../BrandAtmosphere";
+import BackButton from "./BackButton";
 import { leaveSession } from "../../lib/session";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { LogOut, RefreshCw } from "lucide-react";
@@ -8,6 +10,7 @@ import { useRoomStore } from "../../state/useRoomStore";
 import { useNavigate } from "react-router-dom";
 import { THEMES, DEFAULT_THEME } from "../../data/themes";
 import { DESIGN_PACKS } from "../../data/themePacks";
+import { getPhotoStyle } from "../../data/photoStyles";
 
 interface LayoutProps {
   children: ReactNode;
@@ -101,7 +104,7 @@ export default function Layout({ children }: LayoutProps) {
           assignedPhotos: [],
           placedStickers: [],
           drawStrokes: [],
-          filterId: "original",
+          filterId: getPhotoStyle(useSessionStore.getState().themePack?.id).filterId,
         });
       useRoomStore.setState({
         status: snapshot.room.status as typeof previous.status,
@@ -326,6 +329,7 @@ export default function Layout({ children }: LayoutProps) {
       style={{ display: "flex", flexDirection: "column", minHeight: "100%" }}
     >
       {/* ── Top bar ─────────────────────────────────────────── */}
+      <BrandAtmosphere />
       <header
         style={{
           position: "fixed",
@@ -343,6 +347,7 @@ export default function Layout({ children }: LayoutProps) {
           WebkitBackdropFilter: "blur(16px)",
         }}
       >
+        <BackButton />
         {/* Wordmark */}
         <div
           style={{
