@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import vm from "node:vm";
 import ts from "typescript";
-function catalog(file) {
+function catalog(file, dependencies = {}) {
   const exports = {};
   const result = ts.transpileModule(
     readFileSync(new URL(file, import.meta.url), "utf8"),
@@ -15,7 +15,11 @@ function catalog(file) {
       },
     },
   );
-  vm.runInNewContext(result.outputText, { exports, Math });
+  vm.runInNewContext(result.outputText, {
+    exports,
+    Math,
+    require: (name) => dependencies[name],
+  });
   return exports;
 }
 const {
@@ -36,6 +40,87 @@ const {
 } = require("../../photodate-server/dist/runtime.js");
 const { default: db } = require("../../photodate-server/dist/db.js");
 after(() => db.close());
+
+test("all studio themes apply distinct readable UI palettes and clear old inline overrides", () => {
+  const styles = catalog("../src/data/photoStyles.ts");
+  const studio = catalog("../src/data/studioThemes.ts");
+  const themes = catalog("../src/data/themes.ts", { "./photoStyles": styles });
+  const properties = new Map();
+  const root = {
+    dataset: {},
+    classList: { contains: () => true },
+    style: {
+      removeProperty: (key) => properties.delete(key),
+      setProperty: (key, value, priority) =>
+        properties.set(key, { value, priority }),
+    },
+  };
+  const exports = {};
+  const compiled = ts.transpileModule(
+    readFileSync(new URL("../src/lib/applyTheme.ts", import.meta.url), "utf8"),
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+      },
+    },
+  ).outputText;
+  vm.runInNewContext(compiled, {
+    exports,
+    document: {
+      documentElement: root,
+      body: { classList: { remove() {}, add() {} } },
+    },
+    require: (name) => (name.includes("studioThemes") ? studio : themes),
+  });
+  const luminance = (hex) => {
+    const channels = [1, 3, 5]
+      .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  };
+  const backgrounds = new Set();
+  for (const style of styles.PHOTO_STYLES) {
+    exports.applyTheme(style.id);
+    const tokens = studio.studioTokens(style.id);
+    assert.equal(root.dataset.photoStyle, style.id);
+    assert.equal(properties.get("--c-bg").value, tokens["--c-bg"]);
+    assert.equal(properties.get("--c-bg").priority, "important");
+    assert.ok(
+      1.05 / (luminance(tokens["--studio-button"]) + 0.05) >= 4.5,
+      style.id + " button contrast",
+    );
+    assert.ok(
+      (luminance(tokens["--c-text-md"]) + 0.05) /
+        (luminance(tokens["--c-surface-1"]) + 0.05) >=
+        4.5,
+      style.id + " body contrast",
+    );
+    backgrounds.add(tokens["--c-bg"]);
+  }
+  assert.equal(backgrounds.size, 8);
+  exports.resetTheme();
+  assert.equal(properties.size, 0);
+});
+
+test("photo styles resolve to existing export designs and supported filters without changing legacy identities", () => {
+  const { PHOTO_STYLES, getPhotoStyle } = catalog("../src/data/photoStyles.ts");
+  const { FILTER_PRESETS } = catalog("../src/data/filterPresets.ts");
+  assert.equal(PHOTO_STYLES.length, 8);
+  assert.equal(new Set(PHOTO_STYLES.map((s) => s.id)).size, 8);
+  for (const style of PHOTO_STYLES) {
+    const preset = ALL_DESIGNS.find((d) => d.id === style.designId);
+    assert.ok(preset, style.id);
+    assert.equal(design(preset).id, preset.id);
+    assert.ok(
+      FILTER_PRESETS.some((f) => f.id === style.filterId),
+      style.id,
+    );
+    assert.equal(getPhotoStyle(style.id).id, style.id);
+  }
+  assert.equal(getPhotoStyle("meme").name, "Playful");
+  assert.equal(getPhotoStyle("old-or-unknown").id, "classic");
+});
 test("all sixteen layouts have unique identities, nonoverlapping geometry and server support", () => {
   assert.equal(AVAILABLE_LAYOUTS.length, 16);
   assert.equal(new Set(AVAILABLE_LAYOUTS.map((l) => l.id)).size, 16);
