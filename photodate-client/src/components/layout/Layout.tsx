@@ -1,9 +1,11 @@
+import { DEFAULT_TITLE_STYLE } from "../../data/textStyles";
+import LeaveDialog from "./LeaveDialog";
 import RoomClosed from "../RoomClosed";
 import BrandAtmosphere from "../BrandAtmosphere";
-import BackButton from "./BackButton";
+import AppHeader from "./AppHeader";
 import { leaveSession } from "../../lib/session";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { LogOut, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { socket, type RoomSnapshot } from "../../lib/socket";
 import { useSessionStore } from "../../state/useSessionStore";
 import { useRoomStore } from "../../state/useRoomStore";
@@ -31,6 +33,10 @@ export default function Layout({ children }: LayoutProps) {
   const navigateRef = useRef(navigate);
   navigateRef.current = navigate;
 
+  const [showLeave, setShowLeave] = useState(false);
+  const [dismissedDeparture, setDismissedDeparture] = useState("");
+  const messages = useRoomStore((s) => s.messages);
+  const departure = [...messages].reverse().find((m) => m.kind === "departure");
   const [networkOnline, setNetworkOnline] = useState(navigator.onLine);
   const [connectionError, setConnectionError] = useState("");
   useEffect(() => {
@@ -103,8 +109,10 @@ export default function Layout({ children }: LayoutProps) {
         useSessionStore.setState({
           assignedPhotos: [],
           placedStickers: [],
+          textLayers: [],
           drawStrokes: [],
-          filterId: getPhotoStyle(useSessionStore.getState().themePack?.id).filterId,
+          filterId: getPhotoStyle(useSessionStore.getState().themePack?.id)
+            .filterId,
         });
       useRoomStore.setState({
         status: snapshot.room.status as typeof previous.status,
@@ -136,6 +144,8 @@ export default function Layout({ children }: LayoutProps) {
         clearTimeout(debounce);
         debounce = undefined;
         useSessionStore.setState({
+          textLayers: [],
+          titleStyle: { ...DEFAULT_TITLE_STYLE },
           titlePosition: { x: 50, y: 90, auto: true },
           ...snapshot.editor,
           timerMode: snapshot.room.timer_seconds,
@@ -224,10 +234,13 @@ export default function Layout({ children }: LayoutProps) {
       debounce = setTimeout(() => {
         debounce = undefined;
         const {
+          customLayout,
           assignedPhotos,
           placedStickers,
           drawStrokes,
           stripTitle,
+          textLayers,
+          titleStyle,
           titlePosition,
           filterId,
           showWatermark,
@@ -239,10 +252,13 @@ export default function Layout({ children }: LayoutProps) {
           {
             code: roomCode,
             editor: {
+              customLayout,
               assignedPhotos,
               placedStickers,
               drawStrokes,
               stripTitle,
+              textLayers,
+              titleStyle,
               titlePosition,
               filterId,
               showWatermark,
@@ -330,102 +346,8 @@ export default function Layout({ children }: LayoutProps) {
     >
       {/* ── Top bar ─────────────────────────────────────────── */}
       <BrandAtmosphere />
-      <header
-        style={{
-          position: "fixed",
-          insetInline: 0,
-          top: 0,
-          height: "var(--topbar-h)",
-          zIndex: 100,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 var(--sp-6)",
-          borderBottom: "1px solid var(--c-border-soft)",
-          background: "rgba(10,10,15,0.72)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-        }}
-      >
-        <BackButton />
-        {/* Wordmark */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--sp-2)",
-            color: "var(--c-text-hi)",
-            fontWeight: 700,
-            fontSize: "var(--text-md)",
-            letterSpacing: "-0.3px",
-            userSelect: "none",
-          }}
-        >
-          {/* Accent dot */}
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "var(--r-full)",
-              background: "var(--c-accent)",
-              boxShadow: "0 0 8px var(--c-accent)",
-              display: "inline-block",
-              flexShrink: 0,
-            }}
-          />
-          <span>PhotoDate</span>
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: "var(--text-xs)",
-              color: "var(--c-text-lo)",
-              fontWeight: 400,
-              marginLeft: "var(--sp-1)",
-              letterSpacing: "0.5px",
-            }}
-          >
-            PHOTOBOOTH
-          </span>
-        </div>
-
-        {/* Account icon */}
-        <button
-          id="topbar-account-btn"
-          aria-label="Leave session"
-          disabled={!roomCode}
-          onClick={() => {
-            leaveSession();
-            navigate("/");
-          }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 36,
-            height: 36,
-            borderRadius: "var(--r-full)",
-            background: "var(--c-surface-2)",
-            border: "1px solid var(--c-border)",
-            color: "var(--c-text-md)",
-            transition: `background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast)`,
-            cursor: "pointer",
-          }}
-          onMouseEnter={(e) => {
-            const el = e.currentTarget;
-            el.style.background = "var(--c-surface-3)";
-            el.style.color = "var(--c-text-hi)";
-            el.style.borderColor = "var(--c-accent)";
-          }}
-          onMouseLeave={(e) => {
-            const el = e.currentTarget;
-            el.style.background = "var(--c-surface-2)";
-            el.style.color = "var(--c-text-md)";
-            el.style.borderColor = "var(--c-border)";
-          }}
-        >
-          <LogOut size={18} strokeWidth={1.6} />
-        </button>
-      </header>
+      {showLeave && <LeaveDialog onClose={() => setShowLeave(false)} />}
+      <AppHeader onLeave={() => setShowLeave(true)} />
 
       {/* ── Page content ──────────────────────────────────────── */}
       <main
@@ -438,6 +360,24 @@ export default function Layout({ children }: LayoutProps) {
           transition: "background var(--dur-slow)",
         }}
       >
+        {departure && departure.id !== dismissedDeparture && (
+          <aside className="departure-notice" role="status">
+            <div>
+              <strong>
+                {departure.wasHost
+                  ? `${departure.displayName} ended this room`
+                  : `${departure.displayName} left the room`}
+              </strong>
+              <p>Reason: {departure.reason}</p>
+            </div>
+            <button
+              aria-label="Dismiss departure notice"
+              onClick={() => setDismissedDeparture(departure.id)}
+            >
+              ×
+            </button>
+          </aside>
+        )}
         {!networkOnline && roomCode && !roomClosed && (
           <div className="offline-notice" role="status">
             You’re offline. Keep this tab open, reconnect, and retry any pending
