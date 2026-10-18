@@ -1,3 +1,4 @@
+import CustomLayoutEditor from "../components/layout/CustomLayoutEditor";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LayoutTemplate, ArrowRight } from "lucide-react";
@@ -109,6 +110,7 @@ export default function LayoutSelect() {
           />
         </motion.div>
 
+        <CustomLayoutEditor />
         {/* ── Actions ───────────────────────────────────────── */}
         <motion.div
           variants={fadeUp}
