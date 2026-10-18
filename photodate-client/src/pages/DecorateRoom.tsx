@@ -1,3 +1,4 @@
+import TextStyleControls from "../components/editor/TextStyleControls";
 import { publishStage } from "../lib/session";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -26,14 +27,11 @@ export default function DecorateRoom() {
     updateSticker,
     removeSticker,
     clearDrawStrokes,
-    stripTitle,
-    setStripTitle,
-    titlePosition,
-    setTitlePosition,
     showWatermark,
     setShowWatermark,
   } = useSessionStore();
 
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [selectedStickerId, setSelectedStickerId] = useState<string | null>(
     null,
   );
@@ -108,61 +106,19 @@ export default function DecorateRoom() {
             margin: 0,
           }}
         >
-          Add cute stickers to your strip.
+          Style your caption, add stickers, and make it yours.
         </p>
       </div>
 
-      <fieldset className="photo-title-controls" disabled={!isHost}>
-        <legend>Photo title & placement</legend>
-        <label>
-          Title{" "}
-          <input
-            maxLength={200}
-            value={stripTitle}
-            placeholder="Give your photos a title"
-            onChange={(e) => setStripTitle(e.target.value)}
-          />
-        </label>
-        <label>
-          Horizontal position{" "}
-          <input
-            type="range"
-            min="5"
-            max="99"
-            value={titlePosition.x}
-            onChange={(e) =>
-              setTitlePosition({
-                ...titlePosition,
-                x: Number(e.target.value),
-                auto: false,
-              })
-            }
-          />
-        </label>
-        <label>
-          Vertical position{" "}
-          <input
-            type="range"
-            min="5"
-            max="99"
-            value={titlePosition.y}
-            onChange={(e) =>
-              setTitlePosition({
-                ...titlePosition,
-                y: Number(e.target.value),
-                auto: false,
-              })
-            }
-          />
-        </label>
-        <button
-          className="action-secondary"
-          onClick={() => setTitlePosition({ x: 50, y: 90, auto: true })}
-        >
-          Reset placement
-        </button>
-        {!isHost && <p>The host edits the shared photo title.</p>}
-      </fieldset>
+      <TextStyleControls
+        readOnly={!isHost}
+        selectedTextId={selectedTextId}
+        onSelectText={(id) => {
+          setSelectedTextId(id);
+          setSelectedStickerId(null);
+          setActiveTab("stickers");
+        }}
+      />
       {/* Top: Large Strip Preview */}
       <div className="decorate-preview relative flex-1 flex justify-center items-center min-h-0 bg-[var(--c-surface-1)] rounded-[var(--r-lg)] p-4 md:p-8 overflow-hidden">
         <div style={{ width: "100%", height: "100%", position: "relative" }}>
@@ -172,7 +128,12 @@ export default function DecorateRoom() {
             designId={designId}
             photos={assignedPhotos}
             photoFilterCss={selectedFilter.cssFilter}
-            title={stripTitle}
+            editableText={isHost && activeTab === "stickers"}
+            selectedTextId={selectedTextId}
+            onTextSelect={(id) => {
+              setSelectedTextId(id);
+              setSelectedStickerId(null);
+            }}
             showWatermark={showWatermark}
             style={{ width: "100%", height: "100%" }}
           >
