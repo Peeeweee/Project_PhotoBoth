@@ -86,6 +86,7 @@ export interface StripLayout {
    * Set to false for planned layouts that are not yet implemented.
    */
   available: boolean;
+  mixed?: boolean;
 }
 
 // ── Helper ───────────────────────────────────────────────────────────────────
@@ -126,6 +127,84 @@ function denseGrid(columns: number, rows: number): SlotDef[] {
 // ── Layout catalog ────────────────────────────────────────────────────────────
 
 export const STRIP_LAYOUTS: StripLayout[] = [
+  {
+    id: "portrait-pair",
+    name: "Pocket Portraits",
+    label: "2 × 2",
+    description:
+      "Four tall portraits in a little album. Lovely for phone selfies and pairs.",
+    slotCount: 4,
+    columns: 2,
+    rows: 2,
+    frameAspectRatio: 0.75,
+    gapFraction: 0.035,
+    paddingFraction: 0.06,
+    bottomPaddingFraction: 0.18,
+    stripAspectRatio: computeStripAspectRatio(2, 2, 0.75, 0.035, 0.06, 0.18),
+    slots: denseGrid(2, 2),
+    available: true,
+  },
+  {
+    id: "landscape-film",
+    name: "Cinema Club",
+    label: "1 × 3",
+    description:
+      "Three wide film stills for laptop cameras, horizontal phones, and your whole crew.",
+    slotCount: 3,
+    columns: 1,
+    rows: 3,
+    frameAspectRatio: 16 / 9,
+    gapFraction: 0.035,
+    paddingFraction: 0.06,
+    bottomPaddingFraction: 0.18,
+    stripAspectRatio: computeStripAspectRatio(1, 3, 16 / 9, 0.035, 0.06, 0.18),
+    slots: denseGrid(1, 3),
+    available: true,
+  },
+  {
+    id: "mixed-story",
+    name: "Storybook",
+    label: "Mix · 3 shots",
+    mixed: true,
+    description:
+      "One tall portrait beside two wide moments. Mixed cameras keep their full image inside each frame.",
+    slotCount: 3,
+    columns: 2,
+    rows: 2,
+    frameAspectRatio: 1.5,
+    gapFraction: 0.035,
+    paddingFraction: 0.06,
+    bottomPaddingFraction: 0.18,
+    stripAspectRatio: computeStripAspectRatio(2, 2, 1.5, 0.035, 0.06, 0.18),
+    slots: [
+      { index: 0, col: 0, row: 0, colSpan: 1, rowSpan: 2 },
+      { index: 1, col: 1, row: 0, colSpan: 1, rowSpan: 1 },
+      { index: 2, col: 1, row: 1, colSpan: 1, rowSpan: 1 },
+    ],
+    available: true,
+  },
+  {
+    id: "mixed-postcard",
+    name: "Weekend Postcard",
+    label: "Mix · 3 shots",
+    mixed: true,
+    description:
+      "A panoramic opening and two portrait details. A tiny scrapbook for mixed phone and laptop rooms.",
+    slotCount: 3,
+    columns: 2,
+    rows: 3,
+    frameAspectRatio: 1.5,
+    gapFraction: 0.035,
+    paddingFraction: 0.06,
+    bottomPaddingFraction: 0.18,
+    stripAspectRatio: computeStripAspectRatio(2, 3, 1.5, 0.035, 0.06, 0.18),
+    slots: [
+      { index: 0, col: 0, row: 0, colSpan: 2, rowSpan: 1 },
+      { index: 1, col: 0, row: 1, colSpan: 1, rowSpan: 2 },
+      { index: 2, col: 1, row: 1, colSpan: 1, rowSpan: 2 },
+    ],
+    available: true,
+  },
   // ─── 1 × 4 — Classic single-column strip ─────────────────────────────────
   //
   // The quintessential photo-booth strip: 4 landscape frames stacked vertically.
@@ -366,6 +445,21 @@ export const STRIP_LAYOUTS: StripLayout[] = [
 /** All layouts currently available in the picker UI */
 export const AVAILABLE_LAYOUTS = STRIP_LAYOUTS.filter((l) => l.available);
 
+/** Actual ratio of a spanned slot, including the gaps it covers. */
+export function slotAspectRatio(layout: StripLayout, index: number): number {
+  const slot = layout.slots[index] ?? layout.slots[0];
+  const w =
+    (1 -
+      2 * layout.paddingFraction -
+      (layout.columns - 1) * layout.gapFraction) /
+    layout.columns;
+  const h = w / layout.frameAspectRatio;
+  return (
+    (w * slot.colSpan + (slot.colSpan - 1) * layout.gapFraction) /
+    (h * slot.rowSpan + (slot.rowSpan - 1) * layout.gapFraction)
+  );
+}
+
 /**
  * Find the canonical layout for a given LayoutId.
  * When multiple entries share an id (planned stubs), returns the first
@@ -375,9 +469,9 @@ export function getLayout(id: LayoutId): StripLayout {
   return (
     STRIP_LAYOUTS.find((l) => l.id === id && l.available) ??
     STRIP_LAYOUTS.find((l) => l.id === id) ??
-    STRIP_LAYOUTS[0]
+    STRIP_LAYOUTS.find((l) => l.id === "4x1")!
   );
 }
 
 /** Default layout used when none is selected */
-export const DEFAULT_LAYOUT = STRIP_LAYOUTS[0]; // Classic Strip 1×4
+export const DEFAULT_LAYOUT = getLayout("4x1");

@@ -183,11 +183,13 @@ export default function LayoutCard({
           }}
         >
           {layout.slotCount} shots ·{" "}
-          {layout.frameAspectRatio > 1.05
-            ? "Landscape"
-            : layout.frameAspectRatio < 0.95
-              ? "Portrait"
-              : "Square"}{" "}
+          {layout.mixed
+            ? "Mixed portrait + landscape"
+            : layout.frameAspectRatio > 1.05
+              ? "Landscape"
+              : layout.frameAspectRatio < 0.95
+                ? "Portrait"
+                : "Square"}{" "}
           ·{" "}
           {layout.frameAspectRatio < 0.95
             ? "Best for 1–2 people"

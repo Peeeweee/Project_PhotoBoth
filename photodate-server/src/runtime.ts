@@ -83,6 +83,8 @@ export interface Document {
   frameCount: number;
   messages: RoomMessage[];
   photoVotes: PhotoVote[];
+  reviewApprovals: string[];
+  reviewRevision: string;
   shotDeadlines: number[];
   readyParticipantIds: string[];
   approvedParticipantIds: string[];
@@ -106,6 +108,8 @@ export function document(roomId: string): Document {
     frameCount: 4,
     messages: [],
     photoVotes: [],
+    reviewApprovals: [],
+    reviewRevision: "",
     shotDeadlines: [],
     readyParticipantIds: [],
     approvedParticipantIds: [],
@@ -262,6 +266,10 @@ export function rate(key: string, limit = 120) {
     for (const [k, v] of buckets) if (v.until < now) buckets.delete(k);
 }
 export const layouts = [
+  "portrait-pair",
+  "landscape-film",
+  "mixed-story",
+  "mixed-postcard",
   "landscape-2",
   "landscape-3",
   "portrait-4",
@@ -552,6 +560,7 @@ export function removeParticipant(roomId: string, participantId: string) {
     d.photoVotes = d.photoVotes.filter(
       (v) => v.participantId !== participantId,
     );
+    d.reviewApprovals = [];
     d.readyParticipantIds = d.readyParticipantIds.filter(
       (id) => id !== participantId,
     );

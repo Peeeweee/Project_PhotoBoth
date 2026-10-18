@@ -293,6 +293,124 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
     assert.equal(document(host.roomId).photoVotes.length, 1);
     assert.equal(
       (
+        await ack(hs, "update-editor", {
+          code,
+          stage: "editor",
+          editor: { assignedPhotos: [png] },
+        })
+      ).ok,
+      true,
+    );
+    const reviewRevision = document(host.roomId).reviewRevision;
+    assert.ok(reviewRevision);
+    assert.equal(
+      (
+        await ack(gs, "review-approval", {
+          code,
+          revision: "stale",
+          approved: true,
+        })
+      ).ok,
+      false,
+    );
+    assert.equal(
+      (
+        await ack(gs, "review-approval", {
+          code,
+          revision: reviewRevision,
+          approved: true,
+        })
+      ).ok,
+      true,
+    );
+    assert.equal(
+      (await ack(hs, "update-room-state", { code, status: "editing" })).ok,
+      false,
+    );
+    assert.equal(
+      (
+        await ack(hs, "update-editor", {
+          code,
+          stage: "filter",
+          editor: { assignedPhotos: [png] },
+        })
+      ).ok,
+      false,
+    );
+    const approvalBroadcast = new Promise<any>((resolve) => gs.once("collaboration-changed", resolve));
+    assert.equal(
+      (
+        await ack(hs, "review-approval", {
+          code,
+          revision: reviewRevision,
+          approved: true,
+        })
+      ).ok,
+      true,
+    );
+    const approvalState = await approvalBroadcast;
+    assert.equal(approvalState.reviewRevision, reviewRevision);
+    assert.equal(approvalState.reviewApprovals.length, 2);
+    assert.equal(approvalState.editor, undefined);
+    assert.equal(
+      (
+        await ack(hs, "update-editor", {
+          code,
+          stage: "editor",
+          editor: { assignedPhotos: [png], stripTitle: "Still approved" },
+        })
+      ).ok,
+      true,
+    );
+    assert.equal(document(host.roomId).reviewApprovals.length, 2);
+    assert.equal(
+      (
+        await ack(hs, "update-editor", {
+          code,
+          stage: "editor",
+          editor: { assignedPhotos: [""] },
+        })
+      ).ok,
+      true,
+    );
+    assert.equal(document(host.roomId).reviewApprovals.length, 0);
+    assert.equal(
+      (
+        await ack(gs, "review-approval", {
+          code,
+          revision: reviewRevision,
+          approved: true,
+        })
+      ).ok,
+      false,
+    );
+    assert.equal(
+      (
+        await ack(hs, "update-editor", {
+          code,
+          stage: "editor",
+          editor: { assignedPhotos: [png] },
+        })
+      ).ok,
+      true,
+    );
+    const finalRevision = document(host.roomId).reviewRevision;
+    await ack(gs, "review-approval", {
+      code,
+      revision: finalRevision,
+      approved: true,
+    });
+    await ack(hs, "review-approval", {
+      code,
+      revision: finalRevision,
+      approved: true,
+    });
+    assert.equal(
+      (await ack(hs, "update-room-state", { code, status: "editing" })).ok,
+      true,
+    );
+    assert.equal(
+      (
         await ack(gs, "vote-photo", {
           code,
           roundId: "stale",

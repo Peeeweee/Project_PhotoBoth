@@ -1,4 +1,4 @@
-import { getLayout } from "../data/stripLayouts";
+import { getLayout, slotAspectRatio } from "../data/stripLayouts";
 import { useSessionStore } from "../state/useSessionStore";
 import { useRoomStore } from "../state/useRoomStore";
 import type { GetCapturesResponse } from "./api";
@@ -39,14 +39,13 @@ export async function composeCaptures(
         ),
       );
       const canvas = document.createElement("canvas");
-      const ratio = getLayout(
-        useSessionStore.getState().layoutId,
-      ).frameAspectRatio;
+      const layout = getLayout(useSessionStore.getState().layoutId);
+      const ratio = slotAspectRatio(layout, frame);
       canvas.width = ratio >= 1 ? 1200 : Math.round(1200 * ratio);
       canvas.height = ratio >= 1 ? Math.round(1200 / ratio) : 1200;
       const ctx = canvas.getContext("2d")!;
       ctx.fillStyle = "#111";
-      ctx.fillRect(0, 0, 1200, 900);
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       const columns = images.length > 2 ? 2 : images.length;
       const rows = Math.ceil(images.length / columns);
       images.forEach((img, i) => {

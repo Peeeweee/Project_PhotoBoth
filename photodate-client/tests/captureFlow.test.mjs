@@ -61,7 +61,7 @@ test("scheduled camera callbacks retain their original frame and fire at most on
             jsxs: (type, props) => ({ type, props }),
           },
   });
-  const render = (frame) => {
+  const render = (frame, preserveSourceAspect = false) => {
     cursor = 0;
     stateCursor = 0;
     effects.length = 0;
@@ -72,6 +72,7 @@ test("scheduled camera callbacks retain their original frame and fire at most on
       frameIndex: frame,
       roundId: "round",
       captureAspectRatio: 0.75,
+      preserveSourceAspect,
       onCapture: (data, index, round) => captured.push({ index, round }),
     });
   };
@@ -89,6 +90,12 @@ test("scheduled camera callbacks retain their original frame and fire at most on
   documentMock.visibilityState = "hidden";
   timers.at(-1)();
   assert.equal(captured.length, 1); // a backgrounded phone must not upload a stale frame
+  documentMock.visibilityState = "visible";
+  render(2, true);
+  effects.at(-1)();
+  timers.at(-1)();
+  assert.equal(captured.length, 2);
+  assert.equal(canvas.width / canvas.height, 1280 / 720); // mixed layouts preserve the camera's full image
 });
 test("group composition fits the selected frame without cropping any participant image", async () => {
   const draws = [],
@@ -118,7 +125,10 @@ test("group composition fits the selected frame without cropping any participant
     document: { createElement: () => canvas },
     require: (name) =>
       name.includes("stripLayouts")
-        ? { getLayout: () => ({ frameAspectRatio: 1 }) }
+        ? {
+            getLayout: () => ({ frameAspectRatio: 1 }),
+            slotAspectRatio: () => 1,
+          }
         : name.includes("useSessionStore")
           ? { useSessionStore: { getState: () => ({ layoutId: "collage" }) } }
           : {

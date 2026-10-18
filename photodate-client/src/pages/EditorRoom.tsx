@@ -14,8 +14,18 @@ import { getCaptures } from "../lib/api";
 
 export default function EditorRoom() {
   const navigate = useNavigate();
-  const { roomCode, selfId, isHost, photoVotes, roundId, connectionStatus } =
-    useRoomStore();
+  const {
+    roomCode,
+    selfId,
+    isHost,
+    photoVotes,
+    roundId,
+    connectionStatus,
+    participants,
+    reviewApprovals,
+    reviewRevision,
+    reviewPhotos,
+  } = useRoomStore();
   const {
     layoutId,
     designPreset,
@@ -100,6 +110,17 @@ export default function EditorRoom() {
   };
   const isComplete =
     assignedPhotos.length === layout.slotCount && assignedPhotos.every(Boolean);
+  const orderSynced =
+    JSON.stringify(assignedPhotos) === JSON.stringify(reviewPhotos);
+  const allApproved =
+    participants.length > 0 &&
+    participants.every((p) => reviewApprovals.includes(p.id));
+  const movePhoto = (from: number, to: number) => {
+    if (!isHost || to < 0 || to >= assignedPhotos.length) return;
+    const next = [...assignedPhotos];
+    [next[from], next[to]] = [next[to], next[from]];
+    setAssignedPhotos(next);
+  };
 
   const handleNext = () => {
     // Transition the room state to 'editing'.
@@ -295,7 +316,6 @@ export default function EditorRoom() {
               {voteError}
             </p>
           )}
-          <RoomChat />
         </aside>
         <div className="review-preview studio-card">
           <div className="studio-card-heading">
@@ -331,6 +351,102 @@ export default function EditorRoom() {
           </div>
         </div>
       </div>
+      <section className="review-together">
+        <div className="studio-card review-decision">
+          <h2>One last little check ♡</h2>
+          <p className="studio-note">
+            Favorite photos and suggest positions above, or talk it through
+            here. The host arranges the strip; everyone approves the final
+            order. Changing the order resets approvals.
+          </p>
+          <ol className="review-order-list">
+            {assignedPhotos.map((photo, i) => (
+              <li key={i}>
+                <span>{i + 1}</span>
+                {photo ? (
+                  <img src={photo} alt={`Frame ${i + 1}`} />
+                ) : (
+                  <span>Empty frame</span>
+                )}
+                {isHost && (
+                  <>
+                    <button
+                      className="studio-text-button"
+                      aria-label={`Move frame ${i + 1} earlier`}
+                      disabled={i === 0}
+                      onClick={() => movePhoto(i, i - 1)}
+                    >
+                      ←
+                    </button>
+                    <button
+                      className="studio-text-button"
+                      aria-label={`Move frame ${i + 1} later`}
+                      disabled={i === assignedPhotos.length - 1}
+                      onClick={() => movePhoto(i, i + 1)}
+                    >
+                      →
+                    </button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ol>
+          <div className="review-member-approvals" aria-live="polite">
+            {participants.map((p) => (
+              <span className="studio-pill" key={p.id}>
+                {reviewApprovals.includes(p.id) && orderSynced ? "✓" : "○"}{" "}
+                {p.display_name}
+              </span>
+            ))}
+          </div>
+          <button
+            className="action-primary"
+            disabled={
+              !isComplete ||
+              !orderSynced ||
+              !reviewRevision ||
+              connectionStatus !== "joined"
+            }
+            onClick={() => {
+              if (!roomCode) return;
+              socket
+                .timeout(8000)
+                .emit(
+                  "review-approval",
+                  {
+                    code: roomCode,
+                    revision: reviewRevision,
+                    approved: !reviewApprovals.includes(selfId ?? ""),
+                  },
+                  (timeout, ack) => {
+                    if (timeout)
+                      setVoteError(
+                        "Approval not confirmed. Check your connection and try again.",
+                      );
+                    else if (!ack.ok) setVoteError(ack.error.message);
+                  },
+                );
+            }}
+          >
+            {reviewApprovals.includes(selfId ?? "") && orderSynced
+              ? "Change my approval"
+              : "I love this order"}
+          </button>
+          {!orderSynced && (
+            <p className="studio-note" role="status">
+              Saving the latest order…
+            </p>
+          )}
+          {voteError && (
+            <p role="alert" className="studio-note">
+              {voteError}
+            </p>
+          )}
+        </div>
+        <div className="studio-card review-chat">
+          <RoomChat />
+        </div>
+      </section>
       <footer className="studio-footer">
         <div>
           <strong>
@@ -346,10 +462,14 @@ export default function EditorRoom() {
         </div>
         <button
           className="action-primary"
-          disabled={!isComplete || !isHost}
+          disabled={!isComplete || !isHost || !orderSynced || !allApproved}
           onClick={handleNext}
         >
-          {isHost ? "Make it yours" : "Waiting for host"}
+          {isHost
+            ? allApproved && orderSynced
+              ? "Make it yours"
+              : "Waiting for crew approval"
+            : "Waiting for host"}
           <ArrowRight size={17} />
         </button>
       </footer>

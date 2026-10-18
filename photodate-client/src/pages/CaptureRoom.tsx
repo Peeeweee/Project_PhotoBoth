@@ -11,7 +11,9 @@ import {
   Users,
   ArrowRight,
 } from "lucide-react";
-import { getLayout } from "../data/stripLayouts";
+import { getLayout, slotAspectRatio } from "../data/stripLayouts";
+import { StripCanvas } from "../components/editor";
+import LiveSlot from "../components/capture/LiveSlot";
 import { CameraView } from "../components/capture";
 export default function CaptureRoom() {
   const {
@@ -27,16 +29,23 @@ export default function CaptureRoom() {
     connectionStatus,
     captureResumeVersion,
   } = useRoomStore();
-  const { timerMode, shotCount, layoutId } = useSessionStore();
+  const { timerMode, shotCount, layoutId, designPreset, stripTitle } =
+    useSessionStore();
+  const [localShots, setLocalShots] = useState<string[]>([]);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [liveCount, setLiveCount] = useState<number | null>(null);
   const columns = participants.length > 1 ? 2 : 1;
   const rows = Math.ceil(Math.max(1, participants.length) / columns);
-  const cameraAspect = (getLayout(layoutId).frameAspectRatio * rows) / columns;
   const capturedKeys = useRef(new Set<string>());
   const [flashShot, setFlashShot] = useState(0);
   const [votePending, setVotePending] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [index, setIndex] = useState(0);
+  const layout = getLayout(layoutId);
+  const cameraAspect =
+    (slotAspectRatio(layout, Math.min(index, layout.slotCount - 1)) * rows) /
+    columns;
   const [counting, setCounting] = useState(false);
   const [remaining, setRemaining] = useState(3);
   const [uploaded, setUploaded] = useState(0);
@@ -68,6 +77,7 @@ export default function CaptureRoom() {
     setUploaded(uploadedFrames.current.size);
     setCounting(false);
     if (changed) {
+      setLocalShots([]);
       pending.current = [];
       capturedKeys.current.clear();
       setError("");
@@ -102,6 +112,12 @@ export default function CaptureRoom() {
     )
       return;
     capturedKeys.current.add(key);
+    setLiveCount(null);
+    setLocalShots((shots) => {
+      const next = [...shots];
+      next[frame] = data;
+      return next;
+    });
     setCounting(false);
     setFlashShot((n) => n + 1);
     setIndex((i) => Math.max(i, frame + 1));
@@ -249,6 +265,9 @@ export default function CaptureRoom() {
                 roundId={roundId}
                 captureAspectRatio={cameraAspect}
                 allowCameraSwitch={!activeCapture}
+                preserveSourceAspect={layout.mixed}
+                onStream={setCameraStream}
+                onCountdownChange={setLiveCount}
                 onCapture={capture}
                 onReady={onReady}
                 onError={setError}
@@ -295,6 +314,48 @@ export default function CaptureRoom() {
               )}
             </ol>
           </div>
+          <section
+            className="capture-keepsake studio-card"
+            aria-label="Your strip taking shape"
+          >
+            <div className="studio-card-heading">
+              <span>✦ Your strip, coming to life</span>
+              <span className="studio-pill" aria-live="polite">
+                {index < shotCount
+                  ? `Next: frame ${index + 1}`
+                  : "Ready to review"}
+              </span>
+            </div>
+            <div className="capture-strip-preview">
+              {flashShot > 0 && (
+                <div
+                  key={flashShot}
+                  className="shutter-flash"
+                  aria-hidden="true"
+                />
+              )}
+              <StripCanvas
+                layoutId={layoutId}
+                design={designPreset ?? undefined}
+                designId={designPreset?.id ?? "solid-white"}
+                photos={localShots}
+                title={stripTitle}
+                activeSlot={index < shotCount ? index : undefined}
+                renderSlot={(slot) =>
+                  cameraStream &&
+                  ready &&
+                  slot === index &&
+                  index < shotCount ? (
+                    <LiveSlot stream={cameraStream} count={liveCount} />
+                  ) : null
+                }
+              />
+            </div>
+            <p className="studio-note">
+              Your shots land in the highlighted frame. Everyone’s photos
+              combine after upload; choose or reorder them together next.
+            </p>
+          </section>
           {error && (
             <div className="studio-error" role="alert">
               {error}

@@ -18,9 +18,12 @@ function catalog(file) {
   vm.runInNewContext(result.outputText, { exports, Math });
   return exports;
 }
-const { AVAILABLE_LAYOUTS, getLayout, computeStripAspectRatio } = catalog(
-  "../src/data/stripLayouts.ts",
-);
+const {
+  AVAILABLE_LAYOUTS,
+  getLayout,
+  computeStripAspectRatio,
+  slotAspectRatio,
+} = catalog("../src/data/stripLayouts.ts");
 const { ALL_DESIGNS } = catalog("../src/data/themePacks.ts");
 const { EDGE_STYLES, stripEdgeStyle } = catalog("../src/lib/stripEdges.ts");
 // CI builds the server before client checks; isolate this validation from any user database.
@@ -33,9 +36,9 @@ const {
 } = require("../../photodate-server/dist/runtime.js");
 const { default: db } = require("../../photodate-server/dist/db.js");
 after(() => db.close());
-test("all twelve layouts have unique identities, valid slot geometry and server support", () => {
-  assert.equal(AVAILABLE_LAYOUTS.length, 12);
-  assert.equal(new Set(AVAILABLE_LAYOUTS.map((l) => l.id)).size, 12);
+test("all sixteen layouts have unique identities, nonoverlapping geometry and server support", () => {
+  assert.equal(AVAILABLE_LAYOUTS.length, 16);
+  assert.equal(new Set(AVAILABLE_LAYOUTS.map((l) => l.id)).size, 16);
   for (const l of AVAILABLE_LAYOUTS) {
     assert.ok(layouts.includes(l.id), l.id);
     assert.equal(getLayout(l.id).id, l.id);
@@ -53,13 +56,26 @@ test("all twelve layouts have unique identities, valid slot geometry and server 
       ),
     );
     assert.ok(l.slotCount >= 1 && l.slotCount <= 12);
-    for (const s of l.slots)
+    const occupied = new Set();
+    for (const s of l.slots) {
       assert.ok(
         s.col >= 0 &&
           s.row >= 0 &&
           s.col + s.colSpan <= l.columns &&
           s.row + s.rowSpan <= l.rows,
       );
+      for (let row = s.row; row < s.row + s.rowSpan; row++)
+        for (let col = s.col; col < s.col + s.colSpan; col++) {
+          const cell = `${row}:${col}`;
+          assert.equal(occupied.has(cell), false, l.id);
+          occupied.add(cell);
+        }
+      assert.ok(slotAspectRatio(l, s.index) > 0);
+    }
+    if (l.mixed) {
+      assert.ok(l.slots.some((s) => slotAspectRatio(l, s.index) < 1));
+      assert.ok(l.slots.some((s) => slotAspectRatio(l, s.index) > 1));
+    }
   }
 });
 test("every curated design and edge survives server validation", () => {

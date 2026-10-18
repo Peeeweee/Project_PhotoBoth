@@ -116,6 +116,9 @@ export default function Layout({ children }: LayoutProps) {
         stage: snapshot.stage,
         messages: snapshot.messages ?? [],
         photoVotes: snapshot.photoVotes ?? [],
+        reviewApprovals: snapshot.reviewApprovals ?? [],
+        reviewRevision: snapshot.reviewRevision ?? "",
+        reviewPhotos: (snapshot.editor.assignedPhotos as string[]) ?? [],
       });
       const hasPendingEdit =
         previous.isHost &&
@@ -260,6 +263,10 @@ export default function Layout({ children }: LayoutProps) {
       if (isCurrent() && value.roomId === useRoomStore.getState().roomId)
         useRoomStore.setState({
           messages: value.messages,
+          ...(value.roundId === useRoomStore.getState().roundId &&
+          value.reviewRevision === useRoomStore.getState().reviewRevision
+            ? { reviewApprovals: value.reviewApprovals ?? [] }
+            : {}),
           photoVotes:
             value.roundId === useRoomStore.getState().roundId
               ? value.photoVotes

@@ -18,6 +18,8 @@ export interface StripCanvasProps {
   className?: string;
   style?: React.CSSProperties;
   onSlotClick?: (index: number) => void;
+  activeSlot?: number;
+  renderSlot?: (index: number) => React.ReactNode;
   photoFilterCss?: string;
   title?: string;
   showWatermark?: boolean;
@@ -88,6 +90,8 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
       className = "",
       style = {},
       onSlotClick,
+      activeSlot,
+      renderSlot,
       photoFilterCss = "none",
       title = new Date().toLocaleDateString("en-CA").replace(/-/g, "."),
       showWatermark = true,
@@ -240,6 +244,12 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
               return (
                 <div
                   key={slot.index}
+                  className={
+                    activeSlot === slot.index
+                      ? "capture-slot-active"
+                      : undefined
+                  }
+                  data-slot-index={slot.index}
                   role={isClickable ? "button" : undefined}
                   tabIndex={isClickable ? 0 : undefined}
                   aria-label={
@@ -278,30 +288,31 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
                     cursor: isClickable ? "pointer" : "default",
                   }}
                 >
-                  {photoUrl ? (
-                    <FilteredImage
-                      src={photoUrl}
-                      alt={`Slot ${slot.index + 1}`}
-                      filterCss={photoFilterCss}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                        display: "block",
-                        transition: "opacity 0.2s",
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        color: "rgba(0, 0, 0, 0.15)",
-                        fontSize: "2rem",
-                        fontWeight: 300,
-                      }}
-                    >
-                      +
-                    </div>
-                  )}
+                  {renderSlot?.(slot.index) ??
+                    (photoUrl ? (
+                      <FilteredImage
+                        src={photoUrl}
+                        alt={`Slot ${slot.index + 1}`}
+                        filterCss={photoFilterCss}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          display: "block",
+                          transition: "opacity 0.2s",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          color: "rgba(0, 0, 0, 0.15)",
+                          fontSize: "2rem",
+                          fontWeight: 300,
+                        }}
+                      >
+                        +
+                      </div>
+                    ))}
                   {/* Hover overlay if clickable */}
                   {isClickable && photoUrl && (
                     <div

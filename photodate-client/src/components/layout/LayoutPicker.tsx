@@ -16,11 +16,15 @@ export default function LayoutPicker({
   const visible = AVAILABLE_LAYOUTS.filter(
     (l) =>
       orientation === "all" ||
-      (orientation === "landscape"
-        ? l.frameAspectRatio > 1.05
-        : orientation === "portrait"
-          ? l.frameAspectRatio < 0.95
-          : l.frameAspectRatio >= 0.95 && l.frameAspectRatio <= 1.05),
+      (orientation === "mixed" && l.mixed) ||
+      (!l.mixed &&
+        (orientation === "landscape"
+          ? l.frameAspectRatio > 1.05
+          : orientation === "portrait"
+            ? l.frameAspectRatio < 0.95
+            : orientation === "square" &&
+              l.frameAspectRatio >= 0.95 &&
+              l.frameAspectRatio <= 1.05)),
   );
   return (
     <div>
@@ -29,7 +33,7 @@ export default function LayoutPicker({
         role="group"
         aria-label="Photo orientation"
       >
-        {["all", "landscape", "portrait", "square"].map((value) => (
+        {["all", "landscape", "portrait", "square", "mixed"].map((value) => (
           <button
             key={value}
             aria-pressed={orientation === value}

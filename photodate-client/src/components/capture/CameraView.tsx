@@ -14,10 +14,13 @@ export interface CameraViewProps {
   roundId: string | null;
   captureAspectRatio?: number;
   allowCameraSwitch?: boolean;
+  preserveSourceAspect?: boolean;
   isActive?: boolean;
   participants?: { id: string; display_name: string; slot_index: number }[];
   selfId?: string;
   onReady?: (ready: boolean) => void;
+  onStream?: (stream: MediaStream | null) => void;
+  onCountdownChange?: (count: number | null) => void;
   onError?: (message: string) => void;
 }
 
@@ -29,17 +32,32 @@ export default function CameraView({
   roundId,
   captureAspectRatio = 16 / 9,
   allowCameraSwitch = true,
+  preserveSourceAspect = false,
   onCapture,
   isActive = true,
   participants = [],
   selfId,
   onReady,
+  onStream,
+  onCountdownChange,
   onError,
 }: CameraViewProps) {
   const consumed = useRef(new Set<string>());
   const videoRef = useRef<HTMLVideoElement>(null);
-  const callbacks = useRef({ onReady, onError, onCapture });
-  callbacks.current = { onReady, onError, onCapture };
+  const callbacks = useRef({
+    onReady,
+    onError,
+    onCapture,
+    onStream,
+    onCountdownChange,
+  });
+  callbacks.current = {
+    onReady,
+    onError,
+    onCapture,
+    onStream,
+    onCountdownChange,
+  };
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [count, setCount] = useState<number | null>(null);
@@ -116,6 +134,7 @@ export default function CameraView({
         );
         if (video) {
           video.srcObject = stream;
+          callbacks.current.onStream?.(stream);
           await video.play();
         }
         stream.getVideoTracks().forEach((track) => {
@@ -147,6 +166,7 @@ export default function CameraView({
     void start();
     return () => {
       cancelled = true;
+      callbacks.current.onStream?.(null);
       stream?.getTracks().forEach((track) => track.stop());
       if (video) video.srcObject = null;
       callbacks.current.onReady?.(false);
@@ -172,12 +192,16 @@ export default function CameraView({
       consumed.current.has(shotKey)
     ) {
       setCount(null);
+      callbacks.current.onCountdownChange?.(null);
       return;
     }
     const target =
       shotDeadline ?? Date.now() + Math.max(1, timerSeconds) * 1000;
-    const updateCount = () =>
-      setCount(Math.max(0, Math.ceil((target - Date.now()) / 1000)));
+    const updateCount = () => {
+      const next = Math.max(0, Math.ceil((target - Date.now()) / 1000));
+      setCount(next);
+      callbacks.current.onCountdownChange?.(next);
+    };
     updateCount();
     const ticker = window.setInterval(updateCount, 100);
     const timer = window.setTimeout(
@@ -210,14 +234,13 @@ export default function CameraView({
           setCount(null);
           return;
         }
+        const captureRatio = preserveSourceAspect
+          ? video.videoWidth / video.videoHeight
+          : captureAspectRatio;
         canvas.width =
-          captureAspectRatio >= 1
-            ? 1280
-            : Math.round(1280 * captureAspectRatio);
+          captureRatio >= 1 ? 1280 : Math.round(1280 * captureRatio);
         canvas.height =
-          captureAspectRatio >= 1
-            ? Math.round(1280 / captureAspectRatio)
-            : 1280;
+          captureRatio >= 1 ? Math.round(1280 / captureRatio) : 1280;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
         const ratio = canvas.width / canvas.height;
@@ -265,6 +288,7 @@ export default function CameraView({
     roundId,
     captureAspectRatio,
     mirrored,
+    preserveSourceAspect,
   ]);
   const remote = participants.filter((p) => p.id !== selfId);
   return (
@@ -294,7 +318,7 @@ export default function CameraView({
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "cover",
+          objectFit: preserveSourceAspect ? "contain" : "cover",
           transform: mirrored ? "scaleX(-1)" : "none",
         }}
       />

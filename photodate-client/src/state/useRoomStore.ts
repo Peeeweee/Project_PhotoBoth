@@ -23,6 +23,9 @@ export interface RoomState {
   stage: string;
   messages: RoomMessage[];
   photoVotes: PhotoVote[];
+  reviewApprovals: string[];
+  reviewRevision: string;
+  reviewPhotos: string[];
   /** 5-char human join code */
   roomCode: string | null;
   /** host_id stored in the room row */
@@ -73,6 +76,9 @@ const initialState: RoomState = {
   stage: "editor",
   messages: [],
   photoVotes: [],
+  reviewApprovals: [],
+  reviewRevision: "",
+  reviewPhotos: [],
   roomCode: null,
   hostId: null,
   selfId: null,

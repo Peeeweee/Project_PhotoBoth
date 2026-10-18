@@ -52,6 +52,8 @@ export interface CollaborationState {
   messages: RoomMessage[];
   photoVotes: PhotoVote[];
   roundId: string | null;
+  reviewApprovals: string[];
+  reviewRevision: string;
 }
 export interface RoomSnapshot<Editor extends object = Record<string, unknown>> {
   room: RoomRecord;
@@ -63,6 +65,8 @@ export interface RoomSnapshot<Editor extends object = Record<string, unknown>> {
   messages: RoomMessage[];
   photoVotes: PhotoVote[];
   shotDeadlines: number[];
+  reviewApprovals: string[];
+  reviewRevision: string;
   readyParticipantIds: string[];
   approvedParticipantIds: string[];
   expectedParticipantIds: string[];
@@ -106,6 +110,10 @@ export interface ClientToServerEvents<
     ack: Ack<Editor>,
   ) => void;
   "leave-room": (payload: Member, ack: Ack<Editor>) => void;
+  "review-approval": (
+    payload: Member & { revision: string; approved: boolean },
+    ack: Ack<Editor>,
+  ) => void;
   "capture-approval": (
     payload: Member & { approved: boolean },
     ack: Ack<Editor>,

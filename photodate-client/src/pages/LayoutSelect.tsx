@@ -96,8 +96,8 @@ export default function LayoutSelect() {
               lineHeight: "var(--lh-relaxed)",
             }}
           >
-            Twelve ways to keep the moment. Choose a quick duo, a classic strip,
-            or a whole memory sheet.
+            Portraits, wide moments, or a little of both. Find a keepsake for
+            your crew’s cameras — phones and laptops welcome.
           </p>
         </motion.div>
 

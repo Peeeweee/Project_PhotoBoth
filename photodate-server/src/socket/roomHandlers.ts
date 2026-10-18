@@ -203,6 +203,8 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       messages: d.messages,
       photoVotes: d.photoVotes,
       roundId: d.roundId,
+      reviewApprovals: d.reviewApprovals,
+      reviewRevision: d.reviewRevision,
     });
   };
   bind("send-message", (p) => {
@@ -269,6 +271,30 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     save(room.id, d);
     publishCollaboration(room.id);
   });
+  bind("review-approval", (p) => {
+    const { room, participant } = member(p);
+    const d = document(room.id);
+    assert(
+      room.status === "reviewing" &&
+        d.reviewRevision &&
+        p.revision === d.reviewRevision,
+      "The order changed. Check the latest strip before approving.",
+      409,
+    );
+    assert(typeof p.approved === "boolean", "Invalid approval");
+    const photos = d.editor.assignedPhotos;
+    assert(
+      Array.isArray(photos) &&
+        photos.length === d.frameCount &&
+        photos.every((photo) => typeof photo === "string" && photo.length > 0),
+      "Fill every frame before approving",
+      409,
+    );
+    d.reviewApprovals = d.reviewApprovals.filter((id) => id !== participant.id);
+    if (p.approved) d.reviewApprovals.push(participant.id);
+    save(room.id, d);
+    publishCollaboration(room.id);
+  });
   bind("capture-ready", (p) => {
     const { room, participant } = member(p);
     assert(typeof p.ready === "boolean", "ready must be boolean");
@@ -320,6 +346,8 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
         "frameCount must be 1–12",
       );
       d.photoVotes = [];
+      d.reviewApprovals = [];
+      d.reviewRevision = "";
       d.roundId = randomUUID();
       d.frameCount = n;
       d.shotDeadlines = Array.from(
@@ -347,6 +375,8 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       d.stage = "review";
     }
     if (p.status === "ready") {
+      d.reviewApprovals = [];
+      d.reviewRevision = "";
       d.stage = "capture";
       d.roundId = null;
       d.shotDeadlines = [];
@@ -358,6 +388,8 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       captureQueries.deleteByRoom(room.id);
     }
     if (p.status === "waiting") {
+      d.reviewApprovals = [];
+      d.reviewRevision = "";
       d.roundId = null;
       d.shotDeadlines = [];
       d.photoVotes = [];
@@ -368,7 +400,17 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       d.stage = "editor";
       captureQueries.deleteByRoom(room.id);
     }
-    if (p.status === "editing") d.stage = "editor";
+    if (p.status === "editing") {
+      assert(
+        d.reviewRevision &&
+          participantQueries
+            .findByRoom(room.id)
+            .every((person) => d.reviewApprovals.includes(person.id)),
+        "Everyone must approve this photo order first",
+        409,
+      );
+      d.stage = "editor";
+    }
     if (p.status === "exporting") d.stage = "export";
     save(room.id, d);
     roomQueries.setStatus(room.id, p.status as RoomStatus);
@@ -465,6 +507,24 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       "Invalid stage",
     );
     const d = document(room.id);
+    const orderChanged =
+      JSON.stringify(d.editor.assignedPhotos ?? []) !==
+        JSON.stringify(editor.assignedPhotos ?? []) ||
+      d.editor.layoutId !== editor.layoutId;
+    if (room.status === "reviewing" && stage !== "editor")
+      assert(
+        d.reviewRevision &&
+          !orderChanged &&
+          participantQueries
+            .findByRoom(room.id)
+            .every((person) => d.reviewApprovals.includes(person.id)),
+        "Everyone must approve this photo order first",
+        409,
+      );
+    if (orderChanged) {
+      d.reviewRevision = randomUUID();
+      d.reviewApprovals = [];
+    }
     d.editor = editor;
     d.stage = stage;
     save(room.id, d);

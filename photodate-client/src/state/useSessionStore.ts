@@ -33,6 +33,10 @@ export interface ThemePack {
 
 /** Strip layout: how captured frames are arranged */
 export type LayoutId =
+  | "portrait-pair"
+  | "landscape-film"
+  | "mixed-story"
+  | "mixed-postcard"
   | "2x1" // 2 frames stacked vertically
   | "2x2" // 2 × 2 grid (group mode)
   | "3x1" // 3 frames stacked vertically
@@ -153,6 +157,10 @@ function shotCountFromLayout(id: LayoutId): number {
     "landscape-3": 3,
     "portrait-4": 4,
     "group-wide": 1,
+    "portrait-pair": 4,
+    "landscape-film": 3,
+    "mixed-story": 3,
+    "mixed-postcard": 3,
     "6x1": 6,
     "3x2": 6,
     "wide-1": 1,
