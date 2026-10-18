@@ -275,7 +275,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     const { room, participant } = member(p);
     const d = document(room.id);
     assert(
-      room.status === "reviewing" &&
+      ["reviewing", "editing", "exporting"].includes(room.status) &&
         d.reviewRevision &&
         p.revision === d.reviewRevision,
       "The order changed. Check the latest strip before approving.",
@@ -511,7 +511,10 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       JSON.stringify(d.editor.assignedPhotos ?? []) !==
         JSON.stringify(editor.assignedPhotos ?? []) ||
       d.editor.layoutId !== editor.layoutId;
-    if (room.status === "reviewing" && stage !== "editor")
+    if (
+      (room.status === "reviewing" || d.stage === "editor") &&
+      stage !== "editor"
+    )
       assert(
         d.reviewRevision &&
           !orderChanged &&
