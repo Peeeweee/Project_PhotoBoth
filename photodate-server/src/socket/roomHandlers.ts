@@ -25,10 +25,12 @@ import {
   designs,
   design,
   editorDocument,
+  customLayout,
   reserveParticipant,
   markParticipantConnected,
   reclaimExpiredParticipants,
   removeParticipant,
+  leaveReason,
 } from "../runtime";
 const transitions: Record<string, string[]> = {
   waiting: ["ready", "capturing"],
@@ -159,7 +161,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
   });
   bind("leave-room", (p) => {
     const { room, participant } = member(p);
-    removeParticipant(room.id, participant.id);
+    removeParticipant(room.id, participant.id, leaveReason(p.reason));
     for (const other of io.sockets.sockets.values()) {
       if (other.data.participantId === participant.id) {
         other.leave(room.id);
@@ -345,6 +347,13 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
         Number.isInteger(n) && n >= 1 && n <= 12,
         "frameCount must be 1–12",
       );
+      if (room.layout_id === "custom") {
+        const shape = customLayout(d.editor.customLayout);
+        assert(
+          n === shape.frames.length,
+          "Shot count must match your custom frames",
+        );
+      }
       d.photoVotes = [];
       d.reviewApprovals = [];
       d.reviewRevision = "";
@@ -356,7 +365,11 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
           Date.now() + 1500 + (i + 1) * Math.max(1, room.timer_seconds) * 1000,
       );
       d.expectedParticipantIds = people.map((p) => p.id);
-      d.editor = d.customDesign ? { designPreset: d.customDesign } : {};
+      d.editor = {
+        ...(d.customDesign ? { designPreset: d.customDesign } : {}),
+        layoutId: room.layout_id,
+        customLayout: d.editor.customLayout ?? null,
+      };
       d.stage = "capture";
       captureQueries.deleteByRoom(room.id);
     }
@@ -384,7 +397,11 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       d.readyParticipantIds = [];
       d.approvedParticipantIds = [];
       d.expectedParticipantIds = [];
-      d.editor = d.customDesign ? { designPreset: d.customDesign } : {};
+      d.editor = {
+        ...(d.customDesign ? { designPreset: d.customDesign } : {}),
+        layoutId: room.layout_id,
+        customLayout: d.editor.customLayout ?? null,
+      };
       captureQueries.deleteByRoom(room.id);
     }
     if (p.status === "waiting") {
@@ -396,7 +413,10 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       d.readyParticipantIds = [];
       d.approvedParticipantIds = [];
       d.expectedParticipantIds = [];
-      d.editor = {};
+      d.editor = {
+        layoutId: room.layout_id,
+        customLayout: d.editor.customLayout ?? null,
+      };
       d.stage = "editor";
       captureQueries.deleteByRoom(room.id);
     }
@@ -462,6 +482,10 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       "Unknown design",
     );
     const d = document(room.id);
+    if (p.layoutId === "custom")
+      d.editor.customLayout = customLayout(p.customLayout);
+    else d.editor.customLayout = null;
+    d.editor.layoutId = p.layoutId;
     if (p.customDesign) {
       const custom = design(p.customDesign);
       assert(custom.id === p.designId, "Design identity mismatch");
@@ -510,7 +534,9 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     const orderChanged =
       JSON.stringify(d.editor.assignedPhotos ?? []) !==
         JSON.stringify(editor.assignedPhotos ?? []) ||
-      d.editor.layoutId !== editor.layoutId;
+      d.editor.layoutId !== editor.layoutId ||
+      JSON.stringify(d.editor.customLayout) !==
+        JSON.stringify(editor.customLayout);
     if (
       (room.status === "reviewing" || d.stage === "editor") &&
       stage !== "editor"
