@@ -28,7 +28,7 @@
  *   stripAR = 1 / totalH          (strip width is normalised to 1)
  */
 
-import type { LayoutId } from '../state/useSessionStore';
+import type { LayoutId } from "../state/useSessionStore";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,12 +104,10 @@ export function computeStripAspectRatio(
 ): number {
   const bottomPad = bottomPaddingFraction ?? paddingFraction;
   const usableWidth = 1 - 2 * paddingFraction;
-  const frameWidth  = (usableWidth - (columns - 1) * gapFraction) / columns;
+  const frameWidth = (usableWidth - (columns - 1) * gapFraction) / columns;
   const frameHeight = frameWidth / frameAspectRatio;
   const totalHeight =
-    rows * frameHeight +
-    (rows - 1) * gapFraction +
-    paddingFraction + bottomPad;
+    rows * frameHeight + (rows - 1) * gapFraction + paddingFraction + bottomPad;
   return 1 / totalHeight;
 }
 
@@ -136,20 +134,21 @@ export const STRIP_LAYOUTS: StripLayout[] = [
   //   usableW = 0.88  frameW = 0.88  frameH = 0.88 / 1.333 = 0.66
   //   totalH  = 4 × 0.66 + 3 × 0.04 + 2 × 0.06 = 2.64 + 0.12 + 0.12 = 2.88 → stripAR ≈ 0.347
   {
-    id:               '4x1',
-    name:             'Classic Strip',
-    label:            '1 × 4',
-    description:      '4 landscape frames in a single column — the timeless photo-booth format.',
-    slotCount:        4,
-    columns:          1,
-    rows:             4,
-    frameAspectRatio: 1.778,         // 16:9 landscape
-    gapFraction:      0.04,
-    paddingFraction:  0.06,
+    id: "4x1",
+    name: "Classic Strip",
+    label: "1 × 4",
+    description:
+      "4 landscape frames in a single column — the timeless photo-booth format.",
+    slotCount: 4,
+    columns: 1,
+    rows: 4,
+    frameAspectRatio: 1.778, // 16:9 landscape
+    gapFraction: 0.04,
+    paddingFraction: 0.06,
     bottomPaddingFraction: 0.16,
     stripAspectRatio: computeStripAspectRatio(1, 4, 1.778, 0.04, 0.06, 0.16),
-    slots:            denseGrid(1, 4),
-    available:        true,
+    slots: denseGrid(1, 4),
+    available: true,
   },
 
   // ─── 2 × 2 — Group grid ───────────────────────────────────────────────────
@@ -160,98 +159,127 @@ export const STRIP_LAYOUTS: StripLayout[] = [
   //   usableW = 0.90  frameW = (0.90 - 0.04) / 2 = 0.43  frameH = 0.43
   //   totalH  = 2 × 0.43 + 1 × 0.04 + 2 × 0.05 = 1.00 → stripAR = 1.0
   {
-    id:               '2x2',
-    name:             'Group Grid',
-    label:            '2 × 2',
-    description:      '4 landscape frames in a 2-column grid — perfect for groups of four.',
-    slotCount:        4,
-    columns:          2,
-    rows:             2,
-    frameAspectRatio: 1.778,           // 16:9 landscape
-    gapFraction:      0.04,
-    paddingFraction:  0.05,
+    id: "2x2",
+    name: "Group Grid",
+    label: "2 × 2",
+    description:
+      "4 landscape frames in a 2-column grid — perfect for groups of four.",
+    slotCount: 4,
+    columns: 2,
+    rows: 2,
+    frameAspectRatio: 1.778, // 16:9 landscape
+    gapFraction: 0.04,
+    paddingFraction: 0.05,
     bottomPaddingFraction: 0.15,
     stripAspectRatio: computeStripAspectRatio(2, 2, 1.778, 0.04, 0.05, 0.15),
-    slots:            denseGrid(2, 2),
-    available:        true,
+    slots: denseGrid(2, 2),
+    available: true,
   },
 
-  // ─── 1 × 3 — Short strip (planned) ───────────────────────────────────────
+  // ─── 1 × 3 — Short strip  ───────────────────────────────────────
   {
-    id:               '3x1',
-    name:             'Short Strip',
-    label:            '1 × 3',
-    description:      '3 portrait frames in a single column — a quicker session.',
-    slotCount:        3,
-    columns:          1,
-    rows:             3,
+    id: "3x1",
+    name: "Short Strip",
+    label: "1 × 3",
+    description: "3 portrait frames in a single column — a quicker session.",
+    slotCount: 3,
+    columns: 1,
+    rows: 3,
     frameAspectRatio: 0.75,
-    gapFraction:      0.04,
-    paddingFraction:  0.06,
+    gapFraction: 0.04,
+    paddingFraction: 0.06,
     bottomPaddingFraction: 0.16,
     stripAspectRatio: computeStripAspectRatio(1, 3, 0.75, 0.04, 0.06, 0.16),
-    slots:            denseGrid(1, 3),
-    available:        false,         // planned
+    slots: denseGrid(1, 3),
+    available: true,
   },
 
-  // ─── 1 × 2 — Duo (planned) ───────────────────────────────────────────────
+  // ─── 1 × 2 — Duo  ───────────────────────────────────────────────
   {
-    id:               '2x1',
-    name:             'Duo',
-    label:            '1 × 2',
-    description:      '2 portrait frames side by side — quick and intimate.',
-    slotCount:        2,
-    columns:          1,
-    rows:             2,
+    id: "2x1",
+    name: "Duo",
+    label: "1 × 2",
+    description: "Two portrait frames stacked together — quick and intimate.",
+    slotCount: 2,
+    columns: 1,
+    rows: 2,
     frameAspectRatio: 0.75,
-    gapFraction:      0.05,
-    paddingFraction:  0.08,
+    gapFraction: 0.05,
+    paddingFraction: 0.08,
     bottomPaddingFraction: 0.18,
     stripAspectRatio: computeStripAspectRatio(1, 2, 0.75, 0.05, 0.08, 0.18),
-    slots:            denseGrid(1, 2),
-    available:        false,         // planned
+    slots: denseGrid(1, 2),
+    available: true,
   },
 
-  // ─── 1 × 6 — Long roll (planned) ─────────────────────────────────────────
+  // ─── 1 × 6 — Long roll  ─────────────────────────────────────────
   //
-  // Will use LayoutId '4x1' once the store enum is extended to include '6x1'.
-  // Represented here as a separate entry using the closest existing id.
-  // TODO: add '6x1' to LayoutId when this layout ships.
   {
-    id:               '4x1',         // placeholder until '6x1' is added to LayoutId
-    name:             'Long Roll',
-    label:            '1 × 6',
-    description:      '6 portrait frames in a single column — the full memory roll.',
-    slotCount:        6,
-    columns:          1,
-    rows:             6,
+    id: "6x1",
+    name: "Long Roll",
+    label: "1 × 6",
+    description: "6 portrait frames in a single column — the full memory roll.",
+    slotCount: 6,
+    columns: 1,
+    rows: 6,
     frameAspectRatio: 0.75,
-    gapFraction:      0.03,
-    paddingFraction:  0.05,
+    gapFraction: 0.03,
+    paddingFraction: 0.05,
     bottomPaddingFraction: 0.15,
     stripAspectRatio: computeStripAspectRatio(1, 6, 0.75, 0.03, 0.05, 0.15),
-    slots:            denseGrid(1, 6),
-    available:        false,         // planned — requires new LayoutId '6x1'
+    slots: denseGrid(1, 6),
+    available: true,
   },
 
-  // ─── 3 × 2 — Wide grid (planned) ─────────────────────────────────────────
+  // ─── 3 × 2 — Wide grid  ─────────────────────────────────────────
   //
-  // TODO: add '3x2' to LayoutId when this layout ships.
   {
-    id:               '2x2',         // placeholder until '3x2' is added to LayoutId
-    name:             'Wide Grid',
-    label:            '3 × 2',
-    description:      '6 landscape frames in a 3-column grid — cinematic and wide.',
-    slotCount:        6,
-    columns:          3,
-    rows:             2,
-    frameAspectRatio: 1.333,         // 4:3 landscape
-    gapFraction:      0.03,
-    paddingFraction:  0.05,
+    id: "3x2",
+    name: "Wide Grid",
+    label: "3 × 2",
+    description: "6 landscape frames in a 3-column grid — cinematic and wide.",
+    slotCount: 6,
+    columns: 3,
+    rows: 2,
+    frameAspectRatio: 1.333, // 4:3 landscape
+    gapFraction: 0.03,
+    paddingFraction: 0.05,
     bottomPaddingFraction: 0.15,
     stripAspectRatio: computeStripAspectRatio(3, 2, 1.333, 0.03, 0.05, 0.15),
-    slots:            denseGrid(3, 2),
-    available:        false,         // planned — requires new LayoutId '3x2'
+    slots: denseGrid(3, 2),
+    available: true,
+  },
+  {
+    id: "wide-1",
+    name: "Little Polaroid",
+    label: "1 × 1",
+    description: "One square moment with room for a handwritten-style title.",
+    slotCount: 1,
+    columns: 1,
+    rows: 1,
+    frameAspectRatio: 1,
+    gapFraction: 0.04,
+    paddingFraction: 0.07,
+    bottomPaddingFraction: 0.25,
+    stripAspectRatio: computeStripAspectRatio(1, 1, 1, 0.04, 0.07, 0.25),
+    slots: denseGrid(1, 1),
+    available: true,
+  },
+  {
+    id: "collage",
+    name: "Contact Sheet",
+    label: "2 × 3",
+    description: "Six square memories in a compact keepsake sheet.",
+    slotCount: 6,
+    columns: 2,
+    rows: 3,
+    frameAspectRatio: 1,
+    gapFraction: 0.035,
+    paddingFraction: 0.06,
+    bottomPaddingFraction: 0.18,
+    stripAspectRatio: computeStripAspectRatio(2, 3, 1, 0.035, 0.06, 0.18),
+    slots: denseGrid(2, 3),
+    available: true,
   },
 ];
 

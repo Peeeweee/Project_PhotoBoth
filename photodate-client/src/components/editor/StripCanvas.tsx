@@ -1,3 +1,4 @@
+import { stripEdgeStyle } from "../../lib/stripEdges";
 import { designBackground } from "../design/designBackground";
 import React, { forwardRef, useRef, useState, useEffect } from "react";
 import { getLayout } from "../../data/stripLayouts";
@@ -94,6 +95,7 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
     },
     ref,
   ) => {
+    const titlePosition = useSessionStore((state) => state.titlePosition);
     const layout = getLayout(layoutId);
     const customDesigns = useSessionStore((state) => state.customDesigns);
     const selectedDesign = useSessionStore((state) => state.designPreset);
@@ -110,6 +112,20 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
 
     // Parse custom filter CSS if available, else use standard background
 
+    const hex = /^#([0-9a-f]{6})$/i.exec(design.background)?.[1];
+    const darkBackground = hex
+      ? parseInt(hex.slice(0, 2), 16) * 0.299 +
+          parseInt(hex.slice(2, 4), 16) * 0.587 +
+          parseInt(hex.slice(4, 6), 16) * 0.114 <
+        140
+      : [
+          "pat-stars",
+          "pat-midnight",
+          "pat-disco",
+          "pat-aurora",
+          "pat-glitch",
+          "pat-haze",
+        ].includes(design.id);
     const backgroundStyle: React.CSSProperties = {
       ...designBackground(design),
       ...(design.id.startsWith("custom-") ? { background: "#ffffff" } : {}),
@@ -207,13 +223,14 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
               justifyContent: "center",
               alignContent: "center",
               gap: `${layout.gapFraction * INTERNAL_WIDTH}px`,
-              padding: `${layout.paddingFraction * INTERNAL_WIDTH}px ${layout.paddingFraction * INTERNAL_WIDTH}px ${(showWatermark ? (layout.bottomPaddingFraction ?? layout.paddingFraction) : layout.paddingFraction) * INTERNAL_WIDTH}px ${layout.paddingFraction * INTERNAL_WIDTH}px`,
+              padding: `${layout.paddingFraction * INTERNAL_WIDTH}px ${layout.paddingFraction * INTERNAL_WIDTH}px ${(showWatermark || title ? (layout.bottomPaddingFraction ?? layout.paddingFraction) : layout.paddingFraction) * INTERNAL_WIDTH}px ${layout.paddingFraction * INTERNAL_WIDTH}px`,
               boxSizing: "border-box",
               overflow: "hidden",
               boxShadow: "var(--shadow-lg)",
               containerType: "inline-size",
               flexShrink: 0,
               ...backgroundStyle,
+              ...stripEdgeStyle(design.edgeStyle, layout.stripAspectRatio),
             }}
           >
             {layout.slots.map((slot) => {
@@ -243,8 +260,13 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
                   style={{
                     gridColumn: `${slot.col + 1} / span ${slot.colSpan}`,
                     gridRow: `${slot.row + 1} / span ${slot.rowSpan}`,
+                    borderRadius:
+                      design.edgeStyle === "rounded"
+                        ? 28
+                        : design.edgeStyle === "arch"
+                          ? "80px 80px 16px 16px"
+                          : 0,
                     backgroundColor: "rgba(0, 0, 0, 0.1)", // Subtle placeholder background
-                    borderRadius: "2px", // Slight rounding for the frame itself
                     overflow: "hidden",
                     display: "flex",
                     alignItems: "center",
@@ -316,30 +338,34 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
               />
             )}
             {/* Footer Branding Area */}
-            {showWatermark && (
+            {title && (
               <div
                 style={{
                   position: "absolute",
-                  bottom: `${((layout.bottomPaddingFraction ?? layout.paddingFraction) * INTERNAL_WIDTH) / 2}px`, // Centered vertically in the bottom padding
-                  left: 0,
-                  right: 0,
+                  top: `${titlePosition.auto ? 100 - (layout.bottomPaddingFraction ?? layout.paddingFraction) * layout.stripAspectRatio * 50 : titlePosition.y}%`,
+                  left: `${titlePosition.x}%`,
+                  width: "80%",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
                   padding: "0 8%",
-                  color: design.id === "solid-black" ? "#fff" : "#333",
+                  color: darkBackground ? "#fffaf4" : "#333",
                   fontSize: "60px", // 6% of internal width (1000px)
                   lineHeight: 1.2,
                   fontFamily: "monospace",
                   zIndex: 5,
                   opacity: 0.8,
-                  transform: "translateY(50%)", // Perfectly center it around the bottom coordinate
+                  transform: "translate(-50%, -50%)",
+                  textAlign: "center",
+                  overflowWrap: "anywhere",
                 }}
               >
-                <span style={{ fontWeight: 700, letterSpacing: "0.05em" }}>
-                  PhotoDate
-                </span>
+                {showWatermark && (
+                  <span style={{ fontWeight: 700, letterSpacing: "0.05em" }}>
+                    PhotoDate
+                  </span>
+                )}
                 <span style={{ fontSize: "0.8em", opacity: 0.8 }}>{title}</span>
               </div>
             )}

@@ -12,10 +12,13 @@ export interface RoomState {
   sessionToken: string | null;
   roundId: string | null;
   cameraReady: boolean;
+  connectionStatus:
+    "disconnected" | "connecting" | "joining" | "joined" | "error";
   captureResumeVersion: number;
   capturedFrameIndexes: number[];
   shotDeadlines: number[];
   readyParticipantIds: string[];
+  approvedParticipantIds: string[];
   stage: string;
   /** 5-char human join code */
   roomCode: string | null;
@@ -58,10 +61,12 @@ const initialState: RoomState = {
   sessionToken: null,
   roundId: null,
   cameraReady: false,
+  connectionStatus: "disconnected",
   captureResumeVersion: 0,
   capturedFrameIndexes: [],
   shotDeadlines: [],
   readyParticipantIds: [],
+  approvedParticipantIds: [],
   stage: "editor",
   roomCode: null,
   hostId: null,

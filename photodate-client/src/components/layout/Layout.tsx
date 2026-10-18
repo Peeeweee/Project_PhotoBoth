@@ -13,14 +13,14 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const [isConnected, setIsConnected] = useState(socket.connected);
   const themePack = useSessionStore((s) => s.themePack);
   const activeTheme = themePack
     ? (THEMES.find((t) => t.id === themePack.id) ?? DEFAULT_THEME)
     : DEFAULT_THEME;
   const glowRgba = activeTheme.bgGlowRgba;
 
-  const { roomCode, selfId, setStatus, setParticipants } = useRoomStore();
+  const { roomCode, selfId, connectionStatus, setStatus, setParticipants } =
+    useRoomStore();
   const { setLayoutId, setDesignPreset } = useSessionStore();
   const navigate = useNavigate();
   const navigateRef = useRef(navigate);
@@ -32,6 +32,15 @@ export default function Layout({ children }: LayoutProps) {
       setConnectionError("");
       return;
     }
+    let active = true;
+    const isCurrent = () =>
+      active &&
+      useRoomStore.getState().roomCode === roomCode &&
+      useRoomStore.getState().selfId === selfId;
+    useRoomStore.setState({
+      connectionStatus: socket.connected ? "joining" : "connecting",
+    });
+    setConnectionError("");
     let applying = false;
     let debounce: ReturnType<typeof setTimeout> | undefined;
     const route = (status: string, stage = "editor") => {
@@ -54,7 +63,21 @@ export default function Layout({ children }: LayoutProps) {
       if (path) navigateRef.current(path);
     };
     const apply = (snapshot: RoomSnapshot, restoreEditor = false) => {
-      if (snapshot.room.id !== useRoomStore.getState().roomId) return;
+      if (!isCurrent() || snapshot.room.id !== useRoomStore.getState().roomId)
+        return;
+      if (snapshot.room.status === "closed") {
+        useRoomStore.setState({ connectionStatus: "error" });
+        setConnectionError(
+          "This room has closed. Return home to create or join another room.",
+        );
+      } else if (
+        !snapshot.participants.some((person) => person.id === selfId)
+      ) {
+        useRoomStore.setState({ connectionStatus: "error" });
+        setConnectionError(
+          "Your membership in this room has ended. Return home and enter its code again if the session is still open.",
+        );
+      }
       applying = true;
       const previous = useRoomStore.getState();
       if (previous.roundId !== snapshot.roundId)
@@ -88,6 +111,7 @@ export default function Layout({ children }: LayoutProps) {
             deadline - ((snapshot.serverTime ?? Date.now()) - Date.now()),
         ),
         readyParticipantIds: snapshot.readyParticipantIds,
+        approvedParticipantIds: snapshot.approvedParticipantIds ?? [],
         stage: snapshot.stage,
       });
       const hasPendingEdit =
@@ -103,6 +127,7 @@ export default function Layout({ children }: LayoutProps) {
         clearTimeout(debounce);
         debounce = undefined;
         useSessionStore.setState({
+          titlePosition: { x: 50, y: 90, auto: true },
           ...snapshot.editor,
           timerMode: snapshot.room.timer_seconds,
         });
@@ -124,7 +149,8 @@ export default function Layout({ children }: LayoutProps) {
         route(snapshot.room.status, snapshot.stage);
     };
     const join = () => {
-      setIsConnected(true);
+      if (!isCurrent()) return;
+      useRoomStore.setState({ connectionStatus: "joining" });
       socket.emit(
         "join-room",
         {
@@ -133,11 +159,14 @@ export default function Layout({ children }: LayoutProps) {
           sessionToken: useRoomStore.getState().sessionToken ?? "",
         },
         (ack) => {
+          if (!isCurrent()) return;
           if (!ack.ok) {
+            useRoomStore.setState({ connectionStatus: "error" });
             setConnectionError(ack.error.message);
             return;
           }
           setConnectionError("");
+          useRoomStore.setState({ connectionStatus: "joined" });
           if (ack.snapshot) {
             apply(ack.snapshot, true);
             route(ack.snapshot.room.status, ack.snapshot.stage);
@@ -153,7 +182,20 @@ export default function Layout({ children }: LayoutProps) {
         },
       );
     };
-    const disconnected = () => setIsConnected(false);
+    const disconnected = () => {
+      if (isCurrent())
+        useRoomStore.setState({ connectionStatus: "disconnected" });
+    };
+    const connectionFailed = (error: Error) => {
+      if (isCurrent()) {
+        useRoomStore.setState({ connectionStatus: "error" });
+        setConnectionError(error.message || "Could not connect to the server.");
+      }
+    };
+    const retriesExhausted = () =>
+      connectionFailed(
+        new Error("Reconnection stopped. Retry the connection or return home."),
+      );
     const unsubscribe = useSessionStore.subscribe((state) => {
       if (
         applying ||
@@ -171,6 +213,7 @@ export default function Layout({ children }: LayoutProps) {
           placedStickers,
           drawStrokes,
           stripTitle,
+          titlePosition,
           filterId,
           showWatermark,
           designPreset,
@@ -185,6 +228,7 @@ export default function Layout({ children }: LayoutProps) {
               placedStickers,
               drawStrokes,
               stripTitle,
+              titlePosition,
               filterId,
               showWatermark,
               designPreset,
@@ -203,14 +247,19 @@ export default function Layout({ children }: LayoutProps) {
     });
     socket.on("connect", join);
     socket.on("disconnect", disconnected);
+    socket.on("connect_error", connectionFailed);
+    socket.io.on("reconnect_failed", retriesExhausted);
     socket.on("room-snapshot", apply);
     if (socket.connected) join();
     else socket.connect();
     return () => {
+      active = false;
       clearTimeout(debounce);
       unsubscribe();
       socket.off("connect", join);
       socket.off("disconnect", disconnected);
+      socket.off("connect_error", connectionFailed);
+      socket.io.off("reconnect_failed", retriesExhausted);
       socket.off("room-snapshot", apply);
     };
   }, [
@@ -335,7 +384,7 @@ export default function Layout({ children }: LayoutProps) {
           transition: "background var(--dur-slow)",
         }}
       >
-        {!isConnected && roomCode && (
+        {connectionStatus !== "joined" && roomCode && (
           <div
             style={{
               position: "absolute",
@@ -359,13 +408,42 @@ export default function Layout({ children }: LayoutProps) {
               size={14}
               style={{ animation: "spin 2s linear infinite" }}
             />
-            Connection lost. Reconnecting...
+            {connectionStatus === "joining"
+              ? "Joining your room…"
+              : connectionStatus === "error"
+                ? "Room connection needs attention."
+                : "Connecting to the server…"}
           </div>
         )}
         {connectionError && (
-          <p role="alert" style={{ padding: 16, color: "var(--c-error)" }}>
+          <div
+            role="alert"
+            style={{ padding: 16, marginTop: 40, color: "var(--c-error)" }}
+          >
             {connectionError}
-          </p>
+            {roomCode && (
+              <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+                <button
+                  onClick={() => {
+                    setConnectionError("");
+                    socket.disconnect();
+                    useRoomStore.setState({ connectionStatus: "connecting" });
+                    socket.connect();
+                  }}
+                >
+                  Retry connection
+                </button>
+                <button
+                  onClick={() => {
+                    leaveSession();
+                    navigate("/");
+                  }}
+                >
+                  Return home
+                </button>
+              </div>
+            )}
+          </div>
         )}
         {children}
       </main>

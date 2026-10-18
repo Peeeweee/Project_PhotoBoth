@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint --deny-warnings src",
+    "test": "node --experimental-strip-types --test tests/roomCode.test.ts tests/stickerGesture.test.mjs tests/uploadRetry.test.mjs tests/designCatalog.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

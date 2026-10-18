@@ -1,9 +1,10 @@
 import { leaveSession } from "../lib/session";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, ArrowRight, Hash, Users, Camera } from "lucide-react";
 import { createRoom, joinRoom } from "../lib/api";
+import { isRoomCode, normalizeRoomCode } from "../lib/roomCode";
 import { useRoomStore } from "../state/useRoomStore";
 import { useSessionStore } from "../state/useSessionStore";
 import { ThemePicker } from "../components/theme";
@@ -124,6 +125,7 @@ function GroupToggle({
   return (
     <motion.button
       type="button"
+      className="group-mode-control"
       role="switch"
       aria-checked={checked}
       variants={fadeUp}
@@ -174,7 +176,7 @@ function GroupToggle({
             transition: "color var(--dur-fast)",
           }}
         >
-          Group Photobooth
+          {checked ? "Group mode selected" : "Standard mode selected"}
         </div>
         <div
           style={{
@@ -183,7 +185,9 @@ function GroupToggle({
             lineHeight: 1.4,
           }}
         >
-          4 people · 2×2 grid layout
+          {checked
+            ? "2×2 grid · Click to use standard mode"
+            : "Click to use Group Photobooth · 2×2 grid"}
         </div>
       </div>
 
@@ -230,7 +234,11 @@ export default function Landing() {
 
   const [hostName, setHostName] = useState("");
   const [guestName, setGuestName] = useState("");
-  const [joinCode, setJoinCode] = useState(prefillCode.toUpperCase());
+  const [joinCode, setJoinCode] = useState(normalizeRoomCode(prefillCode));
+  const entryPending = useRef(false);
+  useEffect(() => {
+    setJoinCode(normalizeRoomCode(prefillCode));
+  }, [prefillCode]);
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(false);
   const [errorCreate, setErrorCreate] = useState<string | null>(null);
@@ -245,7 +253,8 @@ export default function Landing() {
 
   // ── Create room ────────────────────────────────────────────
   const handleCreate = async () => {
-    if (!hostName.trim()) return;
+    if (!hostName.trim() || entryPending.current) return;
+    entryPending.current = true;
     setLoadingCreate(true);
     setErrorCreate(null);
     try {
@@ -270,17 +279,29 @@ export default function Landing() {
     } catch (e) {
       setErrorCreate((e as Error).message);
     } finally {
+      entryPending.current = false;
       setLoadingCreate(false);
     }
   };
 
   // ── Join room ──────────────────────────────────────────────
   const handleJoin = async () => {
-    if (!guestName.trim() || joinCode.length < 5) return;
+    if (!guestName.trim() || !isRoomCode(joinCode) || entryPending.current)
+      return;
+    entryPending.current = true;
     setLoadingJoin(true);
     setErrorJoin(null);
     try {
       const data = await joinRoom(joinCode, guestName.trim());
+      const current = useRoomStore.getState();
+      if (
+        current.roomId === data.room.id &&
+        current.selfId === data.participantId
+      ) {
+        // Retrying one's own invitation resumes membership; leaving here would revoke it.
+        navigate("/lobby");
+        return;
+      }
       const preferences = {
         themePack: useSessionStore.getState().themePack,
         isGroupMode: useSessionStore.getState().isGroupMode,
@@ -308,6 +329,7 @@ export default function Landing() {
         setErrorJoin(msg);
       }
     } finally {
+      entryPending.current = false;
       setLoadingJoin(false);
     }
   };
@@ -486,7 +508,7 @@ export default function Landing() {
 
             <PrimaryBtn
               id="create-room-btn"
-              disabled={!hostName.trim()}
+              disabled={!hostName.trim() || loadingJoin}
               loading={loadingCreate}
               onClick={handleCreate}
             >
@@ -498,6 +520,7 @@ export default function Landing() {
             <AnimatePresence>
               {errorCreate && (
                 <motion.p
+                  role="alert"
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
@@ -591,9 +614,14 @@ export default function Landing() {
                   placeholder="FUWVJ"
                   value={joinCode}
                   onChange={(e) =>
-                    setJoinCode(e.target.value.toUpperCase().slice(0, 5))
+                    setJoinCode(normalizeRoomCode(e.target.value))
                   }
-                  maxLength={5}
+                  maxLength={32}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  pattern="[A-Za-z]{5}"
+                  onKeyDown={(e) => e.key === "Enter" && handleJoin()}
                   style={{
                     ...inputBase,
                     fontFamily: "var(--font-mono)",
@@ -637,7 +665,9 @@ export default function Landing() {
 
             <PrimaryBtn
               id="join-room-btn"
-              disabled={!guestName.trim() || joinCode.length < 5}
+              disabled={
+                !guestName.trim() || !isRoomCode(joinCode) || loadingCreate
+              }
               loading={loadingJoin}
               onClick={handleJoin}
             >
@@ -649,6 +679,7 @@ export default function Landing() {
             <AnimatePresence>
               {errorJoin && (
                 <motion.p
+                  role="alert"
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}

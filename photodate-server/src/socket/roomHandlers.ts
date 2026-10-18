@@ -25,8 +25,11 @@ import {
   designs,
   design,
   editorDocument,
+  reserveParticipant,
+  markParticipantConnected,
+  reclaimExpiredParticipants,
+  removeParticipant,
 } from "../runtime";
-const grace = new Map<string, ReturnType<typeof setTimeout>>();
 const transitions: Record<string, string[]> = {
   waiting: ["ready", "capturing"],
   ready: ["ready", "capturing", "waiting"],
@@ -37,7 +40,7 @@ const transitions: Record<string, string[]> = {
 };
 export function registerRoomHandlers(io: Server, socket: Socket) {
   const publish = (id: string) => {
-    const s = snapshot(id);
+    const s = snapshot(id, false);
     io.to(id).emit("room-snapshot", { ...s, captures: undefined });
     io.to(id).emit("participant-list-updated", {
       roomId: id,
@@ -114,33 +117,14 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       online.delete(id);
       const d = document(roomId);
       d.readyParticipantIds = d.readyParticipantIds.filter((p) => p !== id);
+      d.approvedParticipantIds = [];
       save(roomId, d);
-      if (!grace.has(id)) {
-        const timer = setTimeout(
-          () => {
-            grace.delete(id);
-            const room = roomQueries.findById(roomId);
-            if (room) {
-              if (room.host_id === id) roomQueries.setStatus(roomId, "closed");
-              else participantQueries.delete(id);
-              const doc = document(roomId);
-              doc.expectedParticipantIds = doc.expectedParticipantIds.filter(
-                (p) => p !== id,
-              );
-              save(roomId, doc);
-              complete(roomId);
-              changed(roomId);
-            }
-          },
-          Number(process.env.RECONNECT_GRACE_MS) || 120000,
-        );
-        timer.unref();
-        grace.set(id, timer);
-      }
+      reserveParticipant(id);
     }
     changed(roomId);
   }
   bind("join-room", (p) => {
+    reclaimExpiredParticipants();
     const room = roomByCode(p.code),
       participant = authenticate(
         room,
@@ -151,7 +135,11 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       "Wrong participant",
       403,
     );
-    if (socket.data.roomId) {
+    if (
+      socket.data.roomId &&
+      (socket.data.roomId !== room.id ||
+        socket.data.participantId !== participant.id)
+    ) {
       offline();
       socket.leave(socket.data.roomId);
     }
@@ -161,11 +149,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       participantId: participant.id,
       sessionToken: p.sessionToken ?? socket.handshake.auth.sessionToken,
     };
-    const timer = grace.get(participant.id);
-    if (timer) {
-      clearTimeout(timer);
-      grace.delete(participant.id);
-    }
+    markParticipantConnected(participant.id);
     const ids = online.get(participant.id) ?? new Set<string>();
     ids.add(socket.id);
     online.set(participant.id, ids);
@@ -175,21 +159,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
   });
   bind("leave-room", (p) => {
     const { room, participant } = member(p);
-    if (participant.id === room.host_id)
-      roomQueries.setStatus(room.id, "closed");
-    else participantQueries.delete(participant.id);
-    const d = document(room.id);
-    d.readyParticipantIds = d.readyParticipantIds.filter(
-      (id) => id !== participant.id,
-    );
-    d.expectedParticipantIds = d.expectedParticipantIds.filter(
-      (id) => id !== participant.id,
-    );
-    save(room.id, d);
-    online.delete(participant.id);
-    const timer = grace.get(participant.id);
-    if (timer) clearTimeout(timer);
-    grace.delete(participant.id);
+    removeParticipant(room.id, participant.id);
     for (const other of io.sockets.sockets.values()) {
       if (other.data.participantId === participant.id) {
         other.leave(room.id);
@@ -200,6 +170,32 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     complete(room.id);
     changed(room.id);
   });
+  bind("capture-approval", (p) => {
+    const { room, participant } = member(p);
+    assert(room.status !== "capturing", "Shots have already started", 409);
+    assert(typeof p.approved === "boolean", "approved must be boolean");
+    const d = document(room.id);
+    const roster = participantQueries
+      .findByRoom(room.id)
+      .map((p) => p.id)
+      .sort()
+      .join(",");
+    if (d.approvalRoster !== roster) d.approvedParticipantIds = [];
+    d.approvalRoster = roster;
+    d.approvedParticipantIds = d.approvedParticipantIds.filter(
+      (id) => id !== participant.id,
+    );
+    if (p.approved) {
+      assert(
+        d.readyParticipantIds.includes(participant.id),
+        "Enable your camera before approving",
+        409,
+      );
+      d.approvedParticipantIds.push(participant.id);
+    }
+    save(room.id, d);
+    changed(room.id);
+  });
   bind("capture-ready", (p) => {
     const { room, participant } = member(p);
     assert(typeof p.ready === "boolean", "ready must be boolean");
@@ -208,6 +204,10 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       (id) => id !== participant.id,
     );
     if (p.ready) d.readyParticipantIds.push(participant.id);
+    else
+      d.approvedParticipantIds = d.approvedParticipantIds.filter(
+        (id) => id !== participant.id,
+      );
     save(room.id, d);
     changed(room.id);
   });
@@ -230,6 +230,17 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
         "Every participant must connect and enable their camera first",
         409,
       );
+      assert(
+        d.approvalRoster ===
+          people
+            .map((p) => p.id)
+            .sort()
+            .join(",") &&
+          people.every((p) => d.approvedParticipantIds.includes(p.id)),
+        "Every participant must approve starting the shots",
+        409,
+      );
+      d.approvedParticipantIds = [];
       const n = p.frameCount ?? 4;
       assert(
         Number.isInteger(n) && n >= 1 && n <= 12,
@@ -265,6 +276,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       d.stage = "capture";
       d.roundId = null;
       d.readyParticipantIds = [];
+      d.approvedParticipantIds = [];
       d.expectedParticipantIds = [];
       d.editor = d.customDesign ? { designPreset: d.customDesign } : {};
       captureQueries.deleteByRoom(room.id);
@@ -272,6 +284,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     if (p.status === "waiting") {
       d.roundId = null;
       d.readyParticipantIds = [];
+      d.approvedParticipantIds = [];
       d.expectedParticipantIds = [];
       d.editor = {};
       d.stage = "editor";
@@ -297,6 +310,9 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
         p.timerSeconds <= 10,
       "Timer must be integer 0–10",
     );
+    const d = document(room.id);
+    d.approvedParticipantIds = [];
+    save(room.id, d);
     roomQueries.setTimerSeconds(room.id, p.timerSeconds);
     io.to(room.id).emit("timer-mode-changed", {
       roomId: room.id,
@@ -374,12 +390,6 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     d.editor = editor;
     d.stage = stage;
     save(room.id, d);
-    io.to(room.id).emit("editor-state-changed", {
-      roomId: room.id,
-      editor,
-      stage,
-      version: d.version,
-    });
     changed(room.id);
   });
   bind("simulate-group", () => {
@@ -395,8 +405,6 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
   });
 }
 export function stopRoomTimers() {
-  for (const timer of grace.values()) clearTimeout(timer);
-  grace.clear();
   online.clear();
   changes.removeAllListeners("room");
 }

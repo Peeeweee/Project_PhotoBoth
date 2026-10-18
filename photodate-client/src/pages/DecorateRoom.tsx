@@ -27,6 +27,9 @@ export default function DecorateRoom() {
     removeSticker,
     clearDrawStrokes,
     stripTitle,
+    setStripTitle,
+    titlePosition,
+    setTitlePosition,
     showWatermark,
     setShowWatermark,
   } = useSessionStore();
@@ -105,8 +108,59 @@ export default function DecorateRoom() {
         </p>
       </div>
 
+      <fieldset className="photo-title-controls" disabled={!isHost}>
+        <legend>Photo title & placement</legend>
+        <label>
+          Title{" "}
+          <input
+            maxLength={200}
+            value={stripTitle}
+            placeholder="Give your photos a title"
+            onChange={(e) => setStripTitle(e.target.value)}
+          />
+        </label>
+        <label>
+          Horizontal position{" "}
+          <input
+            type="range"
+            min="5"
+            max="99"
+            value={titlePosition.x}
+            onChange={(e) =>
+              setTitlePosition({
+                ...titlePosition,
+                x: Number(e.target.value),
+                auto: false,
+              })
+            }
+          />
+        </label>
+        <label>
+          Vertical position{" "}
+          <input
+            type="range"
+            min="5"
+            max="99"
+            value={titlePosition.y}
+            onChange={(e) =>
+              setTitlePosition({
+                ...titlePosition,
+                y: Number(e.target.value),
+                auto: false,
+              })
+            }
+          />
+        </label>
+        <button
+          className="action-secondary"
+          onClick={() => setTitlePosition({ x: 50, y: 90, auto: true })}
+        >
+          Reset placement
+        </button>
+        {!isHost && <p>The host edits the shared photo title.</p>}
+      </fieldset>
       {/* Top: Large Strip Preview */}
-      <div className="flex-1 flex justify-center items-center min-h-0 bg-[var(--c-surface-1)] rounded-[var(--r-lg)] p-4 md:p-8 overflow-hidden">
+      <div className="relative flex-1 flex justify-center items-center min-h-0 bg-[var(--c-surface-1)] rounded-[var(--r-lg)] p-4 md:p-8 overflow-hidden">
         <div style={{ width: "100%", height: "100%", position: "relative" }}>
           <StripCanvas
             layoutId={layoutId}
@@ -196,6 +250,8 @@ export default function DecorateRoom() {
           }}
         >
           <button
+            className="mode-button"
+            aria-pressed={activeTab === "stickers"}
             onClick={() => setActiveTab("stickers")}
             style={{
               background: "none",
@@ -216,6 +272,8 @@ export default function DecorateRoom() {
             Stickers
           </button>
           <button
+            className="mode-button"
+            aria-pressed={activeTab === "draw"}
             onClick={() => setActiveTab("draw")}
             style={{
               background: "none",

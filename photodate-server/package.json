@@ -8,8 +8,9 @@
     "build": "tsc && node -e \"require('fs').copyFileSync('src/schema.sql','dist/schema.sql')\"",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test dist/regression.test.js",
-    "backup": "node dist/backup.js"
+    "test": "npm run build && node --test dist/*.test.js",
+    "backup": "node dist/backup.js",
+    "test:load": "npm run build && node scripts/load-test.cjs"
   },
   "keywords": [],
   "author": "",

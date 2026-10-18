@@ -25,6 +25,7 @@ export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
   {
     autoConnect: false, // connect explicitly when entering a room
     transports: ["websocket", "polling"],
+    tryAllTransports: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
   },

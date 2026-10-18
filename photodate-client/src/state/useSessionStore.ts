@@ -37,6 +37,8 @@ export type LayoutId =
   | "2x2" // 2 × 2 grid (group mode)
   | "3x1" // 3 frames stacked vertically
   | "4x1" // classic 4-strip
+  | "6x1"
+  | "3x2"
   | "wide-1" // single wide panoramic
   | "collage"; // free-form collage
 
@@ -50,6 +52,7 @@ export interface DesignPreset {
   filterCss?: string;
   /** Border style/color for the strip frame */
   borderStyle?: string;
+  edgeStyle?: "square" | "rounded" | "arch" | "ticket" | "postage";
 }
 
 /** Timer mode for the capture countdown (seconds) */
@@ -72,6 +75,7 @@ export interface SessionState {
   drawStrokes: DrawStroke[];
   /** The title of the strip, defaults to today's date */
   stripTitle: string;
+  titlePosition: { x: number; y: number; auto?: boolean };
   /** Session-specific custom designs uploaded by the user */
   customDesigns: DesignPreset[];
   /** Countdown duration before each capture */
@@ -88,6 +92,11 @@ export interface SessionState {
 }
 
 interface SessionActions {
+  setTitlePosition: (position: {
+    x: number;
+    y: number;
+    auto?: boolean;
+  }) => void;
   setThemePack: (theme: ThemePack) => void;
   setLayoutId: (id: LayoutId) => void;
   setDesignPreset: (preset: DesignPreset) => void;
@@ -119,6 +128,7 @@ const initialState: SessionState = {
   assignedPhotos: [],
   placedStickers: [],
   drawStrokes: [],
+  titlePosition: { x: 50, y: 90, auto: true },
   stripTitle: new Date().toLocaleDateString("en-CA").replace(/-/g, "."), // YYYY.MM.DD
   customDesigns: [],
   timerMode: 3,
@@ -135,6 +145,8 @@ function shotCountFromLayout(id: LayoutId): number {
     "2x2": 4,
     "3x1": 3,
     "4x1": 4,
+    "6x1": 6,
+    "3x2": 6,
     "wide-1": 1,
     collage: 6,
   };
@@ -192,6 +204,7 @@ export const useSessionStore = create<SessionStore>()(
       clearDrawStrokes: () => set({ drawStrokes: [] }),
 
       setStripTitle: (stripTitle) => set({ stripTitle }),
+      setTitlePosition: (titlePosition) => set({ titlePosition }),
 
       addCustomDesign: (design) =>
         set((s) => ({

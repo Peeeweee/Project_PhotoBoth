@@ -41,6 +41,42 @@ if (version < 1) {
     db.pragma("foreign_keys = ON");
   }
 }
+// Persist reservation/reconnect deadlines so abandoned REST joins and restarts recover.
+if (version < 2) {
+  db.transaction(() => {
+    db.exec(`CREATE TABLE participant_leases (
+      participant_id TEXT PRIMARY KEY REFERENCES participants(id) ON DELETE CASCADE,
+      expires_at INTEGER
+    );
+    INSERT INTO participant_leases(participant_id,expires_at) SELECT id,NULL FROM participants;
+    CREATE INDEX idx_participant_leases_expiry ON participant_leases(expires_at);
+    PRAGMA user_version=2;`);
+  })();
+}
+// Quota checks stay constant-time as photos accumulate. Triggers cover upserts and cascades.
+if (version < 3) {
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE capture_storage (scope TEXT PRIMARY KEY, bytes INTEGER NOT NULL CHECK(bytes >= 0));
+      INSERT INTO capture_storage SELECT '*', coalesce(sum(length(image_url)),0) FROM captures;
+      INSERT INTO capture_storage SELECT room_id, sum(length(image_url)) FROM captures GROUP BY room_id;
+      CREATE TRIGGER capture_bytes_insert AFTER INSERT ON captures BEGIN
+        UPDATE capture_storage SET bytes=bytes+length(NEW.image_url) WHERE scope='*';
+        INSERT INTO capture_storage VALUES(NEW.room_id,length(NEW.image_url)) ON CONFLICT(scope) DO UPDATE SET bytes=bytes+excluded.bytes;
+      END;
+      CREATE TRIGGER capture_bytes_update AFTER UPDATE OF image_url ON captures BEGIN
+        UPDATE capture_storage SET bytes=bytes+length(NEW.image_url)-length(OLD.image_url) WHERE scope IN ('*',NEW.room_id);
+      END;
+      CREATE TRIGGER capture_bytes_delete AFTER DELETE ON captures BEGIN
+        UPDATE capture_storage SET bytes=bytes-length(OLD.image_url) WHERE scope IN ('*',OLD.room_id);
+      END;
+      CREATE TRIGGER capture_bytes_room_delete AFTER DELETE ON rooms BEGIN
+        DELETE FROM capture_storage WHERE scope=OLD.id;
+      END;
+      PRAGMA user_version=3;
+    `);
+  })();
+}
 export const roomQueries = {
   create: (r: Omit<Room, "created_at">) =>
     db
@@ -105,6 +141,26 @@ export const participantQueries = {
     db.prepare("DELETE FROM participants WHERE id=?").run(id),
 };
 export const captureQueries = {
+  metadataByRoom: (id: string) =>
+    db
+      .prepare(
+        "SELECT id,room_id,participant_id,frame_index,round_id,captured_at FROM captures WHERE room_id=? ORDER BY frame_index,participant_id",
+      )
+      .all(id) as Omit<Capture, "image_url">[],
+  imageLength: (
+    roomId: string,
+    roundId: string,
+    participantId: string,
+    frameIndex: number,
+  ) =>
+    (
+      db
+        .prepare(
+          "SELECT length(image_url) n FROM captures WHERE room_id=? AND round_id=? AND participant_id=? AND frame_index=?",
+        )
+        .get(roomId, roundId, participantId, frameIndex) as
+        { n: number } | undefined
+    )?.n ?? 0,
   create: (c: Omit<Capture, "captured_at">) =>
     db
       .prepare(

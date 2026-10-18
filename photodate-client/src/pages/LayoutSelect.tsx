@@ -40,7 +40,7 @@ export default function LayoutSelect() {
         animate="show"
         style={{
           width: "100%",
-          maxWidth: 640,
+          maxWidth: 1040,
           display: "flex",
           flexDirection: "column",
           gap: "var(--sp-8)",
@@ -96,7 +96,8 @@ export default function LayoutSelect() {
               lineHeight: "var(--lh-relaxed)",
             }}
           >
-            How should we arrange your photos?
+            Eight ways to keep the moment. Choose a quick duo, a classic strip,
+            or a whole memory sheet.
           </p>
         </motion.div>
 

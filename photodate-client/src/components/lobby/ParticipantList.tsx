@@ -1,6 +1,6 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import type { SocketParticipant } from '../../lib/socket';
-import { SLOT_COLORS } from './CopyLinkButton';
+import { motion, AnimatePresence } from "framer-motion";
+import type { SocketParticipant } from "../../lib/socket";
+import { SLOT_COLORS } from "./CopyLinkButton";
 
 interface ParticipantListProps {
   participants: SocketParticipant[];
@@ -20,7 +20,14 @@ export default function ParticipantList({
   }));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)', width: '100%' }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--sp-3)",
+        width: "100%",
+      }}
+    >
       <AnimatePresence>
         {slots.map(({ slot, participant }) =>
           participant ? (
@@ -31,15 +38,16 @@ export default function ParticipantList({
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--sp-3)',
-                padding: 'var(--sp-3) var(--sp-4)',
-                background: 'var(--c-surface-1)',
-                border: `1px solid ${selfId === participant.id ? 'var(--c-accent)' : 'var(--c-border)'}`,
-                borderRadius: 'var(--r-md)',
-                boxShadow: selfId === participant.id ? 'var(--shadow-accent)' : 'none',
-                transition: 'border-color var(--dur-base)',
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--sp-3)",
+                padding: "var(--sp-3) var(--sp-4)",
+                background: "var(--c-surface-1)",
+                border: `1px solid ${selfId === participant.id ? "var(--c-accent)" : "var(--c-border)"}`,
+                borderRadius: "var(--r-md)",
+                boxShadow:
+                  selfId === participant.id ? "var(--shadow-accent)" : "none",
+                transition: "border-color var(--dur-base)",
               }}
             >
               {/* Avatar */}
@@ -47,17 +55,17 @@ export default function ParticipantList({
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: 'var(--r-full)',
+                  borderRadius: "var(--r-full)",
                   background: SLOT_COLORS[slot % SLOT_COLORS.length],
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: 'var(--text-sm)',
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "var(--text-sm)",
                   fontWeight: 700,
-                  color: '#fff',
+                  color: "#fff",
                   flexShrink: 0,
-                  textTransform: 'uppercase',
+                  textTransform: "uppercase",
                 }}
               >
                 {participant.display_name.charAt(0)}
@@ -66,19 +74,19 @@ export default function ParticipantList({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--sp-2)',
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "var(--sp-2)",
                   }}
                 >
                   <span
                     style={{
-                      color: 'var(--c-text-hi)',
+                      color: "var(--c-text-hi)",
                       fontWeight: 600,
-                      fontSize: 'var(--text-base)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      fontSize: "var(--text-base)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {participant.display_name}
@@ -86,11 +94,11 @@ export default function ParticipantList({
                   {selfId === participant.id && (
                     <span
                       style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--c-accent)',
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "var(--text-xs)",
+                        color: "var(--c-accent)",
                         fontWeight: 500,
-                        letterSpacing: '0.5px',
+                        letterSpacing: "0.5px",
                         flexShrink: 0,
                       }}
                     >
@@ -100,9 +108,9 @@ export default function ParticipantList({
                   {slot === 0 && (
                     <span
                       style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--c-text-lo)',
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "var(--text-xs)",
+                        color: "var(--c-text-lo)",
                         fontWeight: 400,
                         flexShrink: 0,
                       }}
@@ -113,34 +121,60 @@ export default function ParticipantList({
                 </div>
                 <div
                   style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--c-text-lo)',
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "var(--text-xs)",
+                    color: "var(--c-text-lo)",
                     marginTop: 2,
                   }}
                 >
-                  Slot {slot + 1} · Joined {new Date(participant.joined_at).toLocaleTimeString()}
+                  Slot {slot + 1} · Joined{" "}
+                  {new Date(participant.joined_at).toLocaleTimeString()}
+                  <span
+                    style={{
+                      display: "block",
+                      color: participant.online
+                        ? "var(--c-success)"
+                        : "var(--c-text-md)",
+                    }}
+                  >
+                    {participant.online
+                      ? "Online"
+                      : "Disconnected · place reserved briefly"}
+                  </span>
                 </div>
               </div>
 
               {/* Online pulse indicator */}
-              <div style={{ position: 'relative', width: 8, height: 8, flexShrink: 0 }}>
+              <div
+                aria-hidden="true"
+                style={{
+                  position: "relative",
+                  width: 8,
+                  height: 8,
+                  flexShrink: 0,
+                }}
+              >
                 <div
                   style={{
                     width: 8,
                     height: 8,
-                    borderRadius: '50%',
-                    background: 'var(--c-success)',
+                    borderRadius: "50%",
+                    background: participant.online
+                      ? "var(--c-success)"
+                      : "var(--c-text-lo)",
                   }}
                 />
                 <div
                   style={{
-                    position: 'absolute',
+                    position: "absolute",
                     inset: -3,
-                    borderRadius: '50%',
-                    background: 'var(--c-success)',
+                    borderRadius: "50%",
+                    background: "var(--c-success)",
                     opacity: 0.3,
-                    animation: 'pulse 2s ease-in-out infinite',
+                    animation: participant.online
+                      ? "pulse 2s ease-in-out infinite"
+                      : "none",
+                    display: participant.online ? "block" : "none",
                   }}
                 />
               </div>
@@ -152,13 +186,13 @@ export default function ParticipantList({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--sp-3)',
-                padding: 'var(--sp-3) var(--sp-4)',
-                background: 'transparent',
-                border: '1px dashed var(--c-border-soft)',
-                borderRadius: 'var(--r-md)',
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--sp-3)",
+                padding: "var(--sp-3) var(--sp-4)",
+                background: "transparent",
+                border: "1px dashed var(--c-border-soft)",
+                borderRadius: "var(--r-md)",
               }}
             >
               {/* Ghost avatar */}
@@ -166,16 +200,16 @@ export default function ParticipantList({
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: 'var(--r-full)',
-                  background: 'var(--c-surface-2)',
+                  borderRadius: "var(--r-full)",
+                  background: "var(--c-surface-2)",
                   flexShrink: 0,
                 }}
               />
               <span
                 style={{
-                  color: 'var(--c-text-lo)',
-                  fontSize: 'var(--text-sm)',
-                  fontStyle: 'italic',
+                  color: "var(--c-text-lo)",
+                  fontSize: "var(--text-sm)",
+                  fontStyle: "italic",
                 }}
               >
                 Waiting for partner…

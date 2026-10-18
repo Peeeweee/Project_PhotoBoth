@@ -20,7 +20,13 @@ export default function DesignPackCard({
   onSelectDesign,
 }: DesignPackCardProps) {
   // Show up to 4 swatches in the collapsed preview
-  const previewSwatches = pack.designs.slice(0, 4);
+  const selectedDesign = pack.designs.find((d) => d.id === selectedDesignId);
+  const previewSwatches = selectedDesign
+    ? [
+        selectedDesign,
+        ...pack.designs.filter((d) => d.id !== selectedDesignId).slice(0, 3),
+      ]
+    : pack.designs.slice(0, 4);
   const remainingCount = Math.max(0, pack.designs.length - 4);
 
   // If any design in this pack is selected, the pack itself is considered "active"
@@ -80,6 +86,15 @@ export default function DesignPackCard({
             {pack.subtitle}
           </div>
 
+          {selectedDesign && (
+            <span className="selected-design-label">
+              <span
+                style={designBackground(selectedDesign)}
+                aria-hidden="true"
+              />
+              <Check size={13} /> Selected: {selectedDesign.name}
+            </span>
+          )}
           {/* Mini swatch row (only visible when collapsed) */}
           <AnimatePresence>
             {!isExpanded && (

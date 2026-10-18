@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import Database from "better-sqlite3";
 import { io as connect, type Socket } from "socket.io-client";
 process.env.DB_PATH = ":memory:";
-process.env.RECONNECT_GRACE_MS = "100";
+process.env.RECONNECT_GRACE_MS = "5000";
 const { httpServer, io } = require("./index") as typeof import("./index");
 const { default: db } = require("./db") as typeof import("./db");
 const { document, save } = require("./runtime") as typeof import("./runtime");
@@ -112,6 +112,22 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
       ).ok,
       false,
     );
+    assert.equal(
+      (
+        await ack(hs, "update-room-selections", {
+          code,
+          layoutId: "3x2",
+          designId: "solid-lavender",
+          customDesign: {
+            id: "solid-lavender",
+            name: "Lavender Milk",
+            background: "#e9ddff",
+            edgeStyle: "postage",
+          },
+        })
+      ).ok,
+      true,
+    );
     for (const s of [hs, gs])
       assert.equal(
         (await ack(s, "capture-ready", { code, ready: true })).ok,
@@ -121,12 +137,68 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
       (await ack(hs, "update-timer-mode", { code, timerSeconds: 1.2 })).ok,
       false,
     );
+    assert.equal(
+      (
+        await ack(hs, "update-room-state", {
+          code,
+          status: "capturing",
+          frameCount: 1,
+        })
+      ).ok,
+      false,
+    ); // cameras alone do not constitute consent
+    assert.equal(
+      (await ack(hs, "capture-approval", { code, approved: "yes" })).ok,
+      false,
+    );
+    assert.equal(
+      (await ack(hs, "capture-approval", { code, approved: true })).ok,
+      true,
+    );
+    assert.equal(
+      (
+        await ack(hs, "update-room-state", {
+          code,
+          status: "capturing",
+          frameCount: 1,
+        })
+      ).ok,
+      false,
+    ); // guest has not approved
+    await ack(gs, "capture-approval", { code, approved: true });
+    await ack(gs, "capture-approval", { code, approved: false });
+    assert.equal(
+      (
+        await ack(hs, "update-room-state", {
+          code,
+          status: "capturing",
+          frameCount: 1,
+        })
+      ).ok,
+      false,
+    ); // withdrawal blocks start
+    await ack(gs, "capture-approval", { code, approved: true });
+    await ack(hs, "update-timer-mode", { code, timerSeconds: 3 });
+    assert.equal(
+      (
+        await ack(hs, "update-room-state", {
+          code,
+          status: "capturing",
+          frameCount: 1,
+        })
+      ).ok,
+      false,
+    ); // timer changes require fresh votes
+    for (const s of [hs, gs])
+      await ack(s, "capture-approval", { code, approved: true });
     const start = await ack(hs, "update-room-state", {
       code,
       status: "capturing",
       frameCount: 1,
     });
     assert.equal(start.ok, true);
+    assert.equal(start.snapshot.room.layout_id, "3x2");
+    assert.equal(start.snapshot.editor.designPreset.edgeStyle, "postage");
     const round = start.snapshot.roundId;
     const d = document(host.roomId);
     d.shotDeadlines = [Date.now() - 1000];
@@ -210,7 +282,11 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
       (
         await ack(hs, "update-editor", {
           code,
-          editor: { title: "Shared" },
+          editor: {
+            title: "Shared",
+            stripTitle: "Our night",
+            titlePosition: { x: 25, y: 75 },
+          },
           stage: "filter",
         })
       ).ok,
@@ -221,14 +297,27 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
       sessionToken: guest.sessionToken,
     });
     assert.equal(restored.snapshot.editor.title, "Shared");
+    assert.deepEqual(restored.snapshot.editor.titlePosition, { x: 25, y: 75 });
+    assert.equal(
+      (
+        await ack(hs, "update-editor", {
+          code,
+          editor: { titlePosition: { x: -1, y: 50 } },
+        })
+      ).ok,
+      false,
+    );
     assert.equal(restored.snapshot.stage, "filter");
+    await ack(gs, "capture-ready", { code, ready: false });
     const retake = await ack(hs, "update-room-state", {
       code,
       status: "capturing",
       frameCount: 1,
     });
-    assert.equal(retake.ok, false); // reconnect reset readiness
+    assert.equal(retake.ok, false); // every participant must remain ready for the next round
     await ack(gs, "capture-ready", { code, ready: true });
+    for (const s of [hs, gs])
+      await ack(s, "capture-approval", { code, approved: true });
     const retry = await ack(hs, "update-room-state", {
       code,
       status: "capturing",
@@ -282,7 +371,7 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
       rmSync(dir, { recursive: true, force: true });
     }
     assert.equal((db.pragma("foreign_key_check") as unknown[]).length, 0);
-    assert.equal(db.pragma("user_version", { simple: true }), 1);
+    assert.equal(db.pragma("user_version", { simple: true }), 3);
   } finally {
     for (const s of sockets) s.disconnect();
     await new Promise<void>((resolve) => io.close(() => resolve()));
@@ -323,7 +412,7 @@ test("legacy two-slot database migrates transactionally without losing valid row
       { env: { ...process.env, DB_PATH: file } },
     );
     const migrated = new Database(file);
-    assert.equal(migrated.pragma("user_version", { simple: true }), 1);
+    assert.equal(migrated.pragma("user_version", { simple: true }), 3);
     assert.equal(
       (
         migrated.prepare("SELECT count(*) n FROM captures").get() as {
@@ -345,6 +434,22 @@ test("legacy two-slot database migrates transactionally without losing valid row
         .run(),
     );
     assert.equal((migrated.pragma("foreign_key_check") as unknown[]).length, 0);
+    const usage = (scope: string) =>
+      (
+        migrated
+          .prepare("SELECT bytes FROM capture_storage WHERE scope=?")
+          .get(scope) as { bytes: number } | undefined
+      )?.bytes ?? 0;
+    assert.equal(usage("*"), "legacy".length);
+    migrated
+      .prepare("UPDATE captures SET image_url='replacement' WHERE id='c'")
+      .run();
+    assert.equal(usage("*"), "replacement".length);
+    assert.equal(usage("r"), "replacement".length);
+    migrated.pragma("foreign_keys = ON");
+    migrated.prepare("DELETE FROM rooms WHERE id='r'").run();
+    assert.equal(usage("*"), 0);
+    assert.equal(usage("r"), 0);
     migrated.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

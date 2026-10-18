@@ -14,7 +14,9 @@ Completed implementation pass 2026-10-17. This file records remediation against 
 | Check | Result |
 | --- | --- |
 | Server typecheck and production build | Pass |
-| Server regression tests | 4 passing tests covering lifecycle/security, legacy migration/backup, pattern CSS, custom upload serialization |
+| Server regression tests | 16 passing tests including focused room-entry concurrency, reservation expiry, presence and process-restart recovery |
+| Client room-code tests | 2 passing tests for normalization and invalid/truncated input |
+| Actual Vite API/socket proxy | Pass: WebSocket host + polling guest, normalized code, authenticated room entry, idempotent retry, leave/revocation |
 | Client production build | Pass; routes split into asynchronous chunks; no oversized-chunk warning |
 | Client strict source lint | Pass, warnings fail the command |
 | npm audit, both complete dependency trees | Zero advisories at verification time |
@@ -24,7 +26,23 @@ Completed implementation pass 2026-10-17. This file records remediation against 
 | Browser: PDF generation | Generated application/pdf download link |
 | Existing database | Not opened or modified by remediation tests |
 
-Backend regression coverage includes missing credentials, host impersonation, malformed socket payloads with and without callbacks, readiness barriers, two participants uploading the same frame index, retries, cross-participant attribution, shared editor authorization, reconnect snapshots, retakes, stale rounds, explicit leave/revocation across sockets, foreign keys, SQLite online backup restoration, legacy slot migration, and unsafe design CSS rejection. Those cases are assertions within four tests, not four individual assertions.
+Backend regression coverage includes missing credentials, host impersonation, malformed socket payloads with and without callbacks, readiness barriers, two participants uploading the same frame index, retries, cross-participant attribution, shared editor authorization, reconnect snapshots, retakes, stale rounds, explicit leave/revocation across sockets, foreign keys, SQLite online backup restoration, legacy slot migration, and unsafe design CSS rejection. The initial regression coverage comprised four top-level tests; the expanded room-entry coverage is recorded below.
+
+## Focused room-entry follow-up — 2026-10-17
+
+The code/lobby/API simulation identified and repaired additional issues:
+
+- Padded lowercase room codes now normalize consistently; invalid extra letters are not silently truncated into another room code.
+- An authenticated REST join retry resumes the same participant, even if a room is full or has already started. The frontend does not leave/revoke that same membership afterward. Switching to another room omits credentials from the previous room.
+- Rapid repeated form submissions share a synchronous guard, preventing duplicate create/join operations from Enter/click races.
+- REST joins no longer prematurely advance the host's setup phase. An identical socket rejoin preserves camera readiness and multi-device presence.
+- Schema version 2 adds persistent participant leases. Initial reservations, disconnected guests, and departed hosts expire without requiring another HTTP request. Restart recovery preserves credentials and lease deadlines, clears stale readiness, and returns interrupted capture to readiness.
+- The lobby waits for an authenticated room acknowledgement, offers connection recovery, accurately distinguishes online/reserved places, and ignores stale callbacks from a previous room.
+- Expired rooms notify and evict connected clients before retention cleanup deletes records.
+
+The expanded suite simulated six concurrent guest requests against three free slots and asserted exactly three successful entries with unique slots. It also covered invalid/unknown/full/started/closed rooms, same-member retries, two devices for one member, explicit leave, capacity reclamation, timed cleanup, host expiry, reconnect, and credentials/deadlines surviving three separate Node processes. The server reports 16 passing tests (including grouped subtests); the client reports two room-code tests. A separate same-process integration probe loaded the actual Vite configuration and confirmed API rewriting plus both socket transports.
+
+Fresh browser click-through verification could not run during this follow-up because the browser tool failed to initialize. Cross-process localhost probing also timed out in this environment; a self-contained Vite/backend probe succeeded. These are testing limitations, not evidence of a deployed network failure. Test databases were temporary/in-memory; the existing application database was untouched.
 
 ## Findings addressed
 
@@ -69,3 +87,45 @@ Backend regression coverage includes missing credentials, host impersonation, ma
 - Production hosting, HTTPS certificates, backups at the deployment destination, load testing, and multi-replica scaling were not executed. The supplied reverse-proxy configuration is a deployment example, not an installed service.
 - Use one backend process. Presence, rate limits, timers, and room broadcasts are process-local. Image storage is bounded SQLite text for this deployment; object storage can be introduced if capacity demands it.
 - The first startup on an existing database runs the tested migration and retention cleanup. Back up the existing database before upgrading; legacy records older than the configured retention will expire. Existing legacy memberships have no private session token and cannot be resumed as authenticated sessions.
+
+
+## Capture feedback, titles, and group approval
+
+- Each successful camera shot triggers a preview-only white shutter flash. Reduced-motion users get a brief border cue instead. The effect is outside the captured image.
+- The host can edit the shared photo title in Decorate and move it using horizontal and vertical sliders. Position is validated by the server, restored in snapshots, and used by all previews and exports. Hiding the PhotoDate watermark leaves the user title visible; clearing the title removes it.
+- Capture start requires separate approval from every current participant, in addition to camera readiness and online presence. Participants can withdraw approval. Countdown changes, disconnects, new rounds, and server recovery clear votes; roster changes require fresh approval. The server rejects attempts to bypass the vote.
+- Primary capture buttons, selected Stickers/Draw modes, and the landing page group mode have stronger visual states and explicit labels.
+- Validation: 16 server tests and 2 client tests pass, with added lifecycle assertions for unanimous approval, withdrawal, countdown resets, retake approval, and title position round trips/rejection. Client production build and lint pass. Browser visual verification could not run because the browser automation runtime failed to initialize (kernel assets path error).
+
+
+## Sticker gesture responsiveness
+
+- Replaced animated sticker translation with pointer capture and frame-limited local transforms. Screen movement is converted using the actual preview scale, so stickers follow the pointer correctly even in narrow four-photo previews.
+- Move, resize, and rotate commit once when released, avoiding shared editor updates during movement. Cancellation restores the saved position and releases gesture listeners. Sticker centers stay within the photo canvas.
+- Resize/rotate/delete handles retain 44-pixel screen targets as the preview shrinks. Keyboard movement, resizing, rotation, and deletion remain available; guest stickers remain read-only.
+- Verified client build/typecheck and lint, plus six client tests including four gesture regression tests for scaled motion, cancellation, pointer ownership, bounds, guest permissions, resize, and rotate. Browser automation remains unavailable because its kernel assets cannot initialize; actual mouse/touch feel still needs a browser check.
+
+
+## Small-launch traffic preparation
+
+Target: 10–25 rooms / up to 100 members. Added constant-time capture quotas (schema v3), metadata-only routine photo checks, bounded request admission, shared-Wi-Fi limits, transient upload retries, and proxy cache/compression settings. The isolated 25-room simulation passes for both 16- and 64-worker bursts, including all-member photo downloads and editor publication. See [TRAFFIC_PLAN.md](TRAFFIC_PLAN.md) for measurements, bandwidth math, reproduction commands, deployment requirements, and remaining limits. Regression coverage now passes 17 server tests and nine client tests. Existing user data remains untouched by the tests; back up before applying the migration in normal startup.
+
+
+## Strip catalog and studio UI refresh
+
+- Eight unique live layouts: Classic Strip, Group Grid, Short Strip, Duo, Long Roll, Wide Grid, Little Polaroid, and Contact Sheet. New layout IDs have matching server allowlists and capture counts.
+- Five frame finishes: Classic, Soft, Arch, Ticket, and Postage. Finish is part of the validated design document and survives selections, rounds, snapshots, and export rendering. Rounded/arched finishes also soften photo corners. PNG keeps transparent cutouts; JPEG flattens cutouts onto white without changing the frame color.
+- Forty curated designs across five collections, including ten additional colors and twelve picnic/floral/cloud/journal/neon/cosmic prints. Patterns use CSS rather than downloaded image assets. Title contrast adapts to dark frames; automatic title placement follows each layout footer, with manual controls retained.
+- Capture has a responsive camera/crew layout, approval progress, member status cards, segmented countdown controls, a consistent host start action, and a shot timeline. Selecting the already-active countdown does not send a reset request.
+- Photo review has a bounded preview, separate camera-roll panel, used-photo markers, fill/clear actions, and a clear completion footer. Branding controls are anchored inside the preview card. Mobile layouts stack without shrinking everything into the desktop arrangement.
+- Verified client production build/lint, 13 client tests, and 17 server tests. Catalog tests validate every design/edge combination and all layout geometry; the authenticated lifecycle verifies a new layout and edge survive capture start. Browser visual QA and actual decorative-edge export pixels remain unverified because the browser automation runtime fails to initialize (kernel assets path error).
+
+
+## Visible design selections
+
+The design picker now includes a live strip preview using the actual StripCanvas renderer, plus the chosen design/collection, layout, photo count, and edge name. The preview stays alongside collections on desktop and becomes a compact summary above them on mobile. Each selected collection also shows the exact design name and swatch while collapsed, with that swatch first in the mini-preview row. Unselected previews remain clearly labeled as a prompt rather than silently selecting a design. No camera permission or image downloads are needed for this preview.
+
+
+## Deployment preparation
+
+Added a root multi-stage Dockerfile, a build-context exclusion list for local secrets/data/dependencies, and optional single-origin static hosting with `/api/rooms` aliases. The deployment regression verifies SPA fallback, immutable asset caching, JSON API/asset misses, and authenticated room access. All 18 server and 13 client tests, frontend build, and lint pass. See DEPLOYMENT.md for account/service/volume/environment setup. No live service or paid resources have been created. The Docker image build remains unverified because the local Docker daemon is not running; local application checks pass independently.

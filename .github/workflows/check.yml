@@ -24,5 +24,7 @@ jobs:
         working-directory: photodate-client
       - run: npm run lint
         working-directory: photodate-client
+      - run: npm test
+        working-directory: photodate-client
       - run: npm run build
         working-directory: photodate-client

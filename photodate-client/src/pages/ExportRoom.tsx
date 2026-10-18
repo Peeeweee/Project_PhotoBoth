@@ -56,7 +56,7 @@ export default function ExportRoom() {
     setExportError("");
     setIsExporting(format);
     try {
-      const { toPng, toJpeg } = await import("html-to-image");
+      const { toPng, toCanvas } = await import("html-to-image");
       const node = document.getElementById(
         `strip-canvas-${layoutId}-${designId.replace(/[^a-zA-Z0-9]/g, "-")}`,
       );
@@ -64,10 +64,19 @@ export default function ExportRoom() {
       await waitForExport(node);
 
       const pixelRatio = 3200 / Math.max(node.offsetWidth, node.offsetHeight);
-      const dataUrl =
-        format === "png"
-          ? await toPng(node, { pixelRatio, skipFonts: true })
-          : await toJpeg(node, { pixelRatio, quality: 1.0, skipFonts: true });
+      let dataUrl: string;
+      if (format === "png")
+        dataUrl = await toPng(node, { pixelRatio, skipFonts: true });
+      else {
+        const canvas = await toCanvas(node, { pixelRatio, skipFonts: true });
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Could not prepare your image.");
+        // JPEG has no transparency: fill behind the clipped edge without recoloring the frame.
+        context.globalCompositeOperation = "destination-over";
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        dataUrl = canvas.toDataURL("image/jpeg", 1);
+      }
 
       const link = document.createElement("a");
       link.download = `${stripTitle || "photodate"}.${format}`;
@@ -203,6 +212,7 @@ export default function ExportRoom() {
         <input
           type="text"
           aria-label="Photo strip title"
+          maxLength={200}
           value={stripTitle}
           onChange={(e) => setStripTitle(e.target.value)}
           disabled={!isHost}

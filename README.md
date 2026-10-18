@@ -27,7 +27,7 @@ Mobile camera testing needs HTTPS with a trusted certificate or tunnel; plain HT
 
 ## Checks
 
-From the server directory run `npm run typecheck` and `npm test`. From the client directory run `npm run lint` and `npm run build`. CI runs these checks on Node 24. Backend regression tests use temporary/in-memory data and real Socket.IO clients. `npm audit` requires access to the npm registry.
+From the server directory run `npm run typecheck` and `npm test`. From the client directory run `npm test`, `npm run lint` and `npm run build`. CI runs these checks on Node 24. Backend regression tests use temporary/in-memory data and real Socket.IO clients. `npm audit` requires access to the npm registry.
 
 ## Configuration
 
@@ -40,13 +40,17 @@ See each package's .env.example. Never commit private .env/database files.
 | CLIENT_ORIGINS | http://localhost:5173 | Comma-separated browser origins |
 | DB_PATH | server directory/photodate.db | Prefer an absolute persistent database path |
 | RETENTION_HOURS | 24 | Room lifetime; expired room data is removed periodically |
-| RECONNECT_GRACE_MS | 120000 | Guest removal / host room closure after disconnect |
+| RECONNECT_GRACE_MS | 120000 | Reservation lifetime before first socket join, then guest removal / host room closure after disconnect |
 
 Create/join issues a private session token held in sessionStorage. REST calls use a bearer credential; socket joins authenticate with the token. Participant IDs grant no authority. Clearing browser session data loses the membership; account recovery is not implemented. Reconnect restores authoritative room/editor state while membership is valid. Explicit leave acts immediately.
+
+Room codes accept lowercase and surrounding whitespace. Retrying a join with the existing room credential resumes the same membership without consuming a slot; new guests can join only before capture starts. Reserved places expire after the configured grace period if a device never connects. Restart recovery preserves credentials, gives previously connected members a reconnect window, and resets an interrupted capture to camera readiness instead of replaying old deadlines. These leases were added in schema version 2; schema version 3 adds transactional capture-storage counters.
 
 Photo bytes and editor data are stored in SQLite for the room lifetime. Browser persistence keeps compact preferences and identity, not the entire photo document. Image sizes/dimensions/types, frame counts, editor size, rooms, rates and storage are bounded. This targets small single-server deployments.
 
 ## Production
+
+For the fastest single-service deployment, see [DEPLOYMENT.md](DEPLOYMENT.md) and the root Dockerfile. It serves the built frontend, API, and Socket.IO from one origin with a persistent database volume.
 
 Run `npm run build` in each package. Start the backend with `npm start` and serve photodate-client/dist as static assets. The server build bundles its schema and can run without the source directory.
 

@@ -44,6 +44,7 @@ export interface RoomSnapshot<Editor extends object = Record<string, unknown>> {
   frameCount: number;
   shotDeadlines: number[];
   readyParticipantIds: string[];
+  approvedParticipantIds: string[];
   expectedParticipantIds: string[];
   version: number;
   serverTime: number;
@@ -72,6 +73,10 @@ export interface ClientToServerEvents<
     ack: Ack<Editor>,
   ) => void;
   "leave-room": (payload: Member, ack: Ack<Editor>) => void;
+  "capture-approval": (
+    payload: Member & { approved: boolean },
+    ack: Ack<Editor>,
+  ) => void;
   "capture-ready": (
     payload: Member & { ready: boolean },
     ack: Ack<Editor>,

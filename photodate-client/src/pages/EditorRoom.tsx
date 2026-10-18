@@ -1,7 +1,7 @@
 import { publishStage } from "../lib/session";
 import { composeCaptures } from "../lib/composeCaptures";
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { ArrowRight, Check, Images, WandSparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useRoomStore } from "../state/useRoomStore";
 import { useSessionStore } from "../state/useSessionStore";
@@ -75,7 +75,8 @@ export default function EditorRoom() {
     }
   };
 
-  const isComplete = assignedPhotos.every(Boolean);
+  const isComplete =
+    assignedPhotos.length === layout.slotCount && assignedPhotos.every(Boolean);
 
   const handleNext = () => {
     // Transition the room state to 'editing'.
@@ -92,7 +93,7 @@ export default function EditorRoom() {
           if (res.ok) {
             publishStage("filter", () => navigate("/filter"));
           } else {
-            console.error(res.error);
+            setLoadError(res.error.message);
           }
         },
       );
@@ -122,146 +123,154 @@ export default function EditorRoom() {
     );
   }
 
+  const filled = assignedPhotos.filter(Boolean).length;
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        padding: "var(--sp-4)",
-        gap: "var(--sp-4)",
-      }}
-    >
-      <div style={{ textAlign: "center", flexShrink: 0 }}>
-        <h1
-          style={{
-            fontSize: "clamp(1.5rem, 4vw, var(--text-2xl))",
-            fontWeight: 700,
-            color: "var(--c-text-hi)",
-            margin: "0 0 var(--sp-1)",
-          }}
-        >
-          Pick your shots
-        </h1>
-        <p
-          style={{
-            color: "var(--c-text-md)",
-            fontSize: "var(--text-sm)",
-            margin: 0,
-          }}
-        >
-          Tap a photo to add it to your strip. Photos can be reused. Tap a slot
-          to remove it.
-        </p>
-      </div>
-
-      <div className="flex flex-col-reverse md:flex-row flex-1 gap-4 min-h-0 overflow-hidden w-full">
-        {/* Left Side: Thumbnail Pool */}
-        <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 auto-rows-max gap-2 overflow-y-auto content-start md:pr-2 pb-4 md:pb-0">
-          {captures.map((capture, idx) => {
-            const isUsed = assignedPhotos.includes(capture.image_url);
-            return (
-              <motion.div
-                key={capture.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: idx * 0.05 }}
-                role="button"
-                tabIndex={isHost ? 0 : -1}
-                aria-disabled={!isHost}
-                aria-label={`Use photo ${idx + 1}`}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleSelectThumbnail(capture.image_url);
-                  }
-                }}
-                onClick={() => handleSelectThumbnail(capture.image_url)}
-                style={{
-                  aspectRatio: `${layout.frameAspectRatio}`,
-                  borderRadius: "var(--r-md)",
-                  overflow: "hidden",
-                  cursor: isHost ? "pointer" : "default",
-                  position: "relative",
-                  border: `2px solid ${isUsed ? "transparent" : "var(--c-accent)"}`,
-                  opacity: isUsed ? 0.3 : 1,
-                  filter: isUsed ? "grayscale(100%)" : "none",
-                  transition: "all 0.2s",
-                }}
-              >
-                <img
-                  src={capture.image_url}
-                  alt={`Capture ${idx + 1}`}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </motion.div>
-            );
-          })}
+    <section className="studio-page review-studio">
+      <header className="studio-heading">
+        <div>
+          <span className="studio-eyebrow">
+            <Images size={14} /> THE CAMERA ROLL
+          </span>
+          <h1>Keep the good ones.</h1>
+          <p>
+            Choose the moments that feel like you. A favorite can appear more
+            than once.
+          </p>
         </div>
-
-        {/* Right Side: Strip Canvas */}
-        <div
-          className="shrink-0 flex justify-center items-center bg-[var(--c-surface-1)] rounded-[var(--r-lg)] p-4 border border-[var(--c-border)] w-full md:w-auto md:flex-1 overflow-hidden"
-          style={{ minHeight: "300px", maxHeight: "80vh" }}
-        >
-          <div style={{ width: "100%", height: "100%", position: "relative" }}>
+        <span className="studio-room-tag">
+          {layout.name}
+          <strong>
+            {filled} / {layout.slotCount} filled
+          </strong>
+        </span>
+      </header>
+      <div className="review-studio-grid">
+        <aside className="photo-library studio-card">
+          <div className="studio-card-heading">
+            <span>
+              <Images size={17} /> Your shots
+            </span>
+            <span className="studio-pill">{captures.length} photos</span>
+          </div>
+          <p className="studio-note">
+            {isHost
+              ? "Tap a photo to fill the next empty frame. Tap a frame in the preview to clear it."
+              : "Your host is arranging the shared strip. Watch it come together here."}
+          </p>
+          <div className="photo-library-grid">
+            {captures.map((capture, idx) => {
+              const used = assignedPhotos.filter(
+                (p) => p === capture.image_url,
+              ).length;
+              return (
+                <button
+                  key={capture.id}
+                  className={`shot-choice ${used ? "is-used" : ""}`}
+                  disabled={!isHost || isComplete}
+                  onClick={() => handleSelectThumbnail(capture.image_url)}
+                  aria-label={`Use photo ${idx + 1}${used ? `, used ${used} times` : ""}`}
+                >
+                  <img
+                    src={capture.image_url}
+                    alt={`Shot ${idx + 1}`}
+                    draggable={false}
+                  />
+                  <span className="shot-number">
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+                  {used > 0 && (
+                    <span className="shot-used">
+                      <Check size={12} />
+                      {used > 1 ? used : ""}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {isHost && (
+            <div className="library-actions">
+              <button
+                className="action-secondary studio-wide"
+                disabled={!captures.length || isComplete}
+                onClick={() =>
+                  setAssignedPhotos(
+                    assignedPhotos.map(
+                      (p, i) => p || captures[i % captures.length].image_url,
+                    ),
+                  )
+                }
+              >
+                <WandSparkles size={16} /> Fill my strip
+              </button>
+              <button
+                className="studio-text-button"
+                disabled={!filled}
+                onClick={() =>
+                  setAssignedPhotos(Array(layout.slotCount).fill(null))
+                }
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
+        </aside>
+        <div className="review-preview studio-card">
+          <div className="studio-card-heading">
+            <span>YOUR KEEPSAKE</span>
+            {isHost && (
+              <button
+                className="studio-text-button"
+                aria-pressed={showWatermark}
+                onClick={() => setShowWatermark(!showWatermark)}
+              >
+                {showWatermark ? "Hide branding" : "Show branding"}
+              </button>
+            )}
+          </div>
+          <div className="review-canvas">
             <StripCanvas
               layoutId={layoutId}
               design={designPreset ?? undefined}
               designId={designId}
               photos={assignedPhotos}
-              onSlotClick={handleSlotClick}
+              onSlotClick={isHost ? handleSlotClick : undefined}
               title={stripTitle}
               showWatermark={showWatermark}
-              style={{ width: "100%", height: "100%" }}
             />
           </div>
-          {/* Toggle Watermark Button */}
-          {isHost && (
-            <button
-              onClick={() => setShowWatermark(!showWatermark)}
-              style={{
-                position: "absolute",
-                top: "var(--sp-2)",
-                right: "var(--sp-2)",
-                background: "rgba(0,0,0,0.5)",
-                color: "#fff",
-                border: "none",
-                padding: "var(--sp-1) var(--sp-2)",
-                borderRadius: "var(--r-md)",
-                fontSize: "var(--text-xs)",
-                cursor: "pointer",
-                zIndex: 10,
-                backdropFilter: "blur(4px)",
-              }}
-            >
-              {showWatermark ? "Hide Watermark" : "Show Watermark"}
-            </button>
-          )}
+          <div className="preview-caption">
+            <span>{designPreset?.name ?? "Classic frame"}</span>
+            <span>
+              {filled === layout.slotCount
+                ? "Looking good ✨"
+                : `${layout.slotCount - filled} frames to fill`}
+            </span>
+          </div>
         </div>
       </div>
-
-      {/* Next Button */}
-      <div style={{ flexShrink: 0, display: "flex", justifyContent: "center" }}>
+      <footer className="studio-footer">
+        <div>
+          <strong>
+            {isComplete
+              ? "Your strip is looking good."
+              : "A few more moments to choose."}
+          </strong>
+          <p>
+            {isHost
+              ? "Next up: filters, stickers, and all the finishing touches."
+              : "Your host will continue when the strip is ready."}
+          </p>
+        </div>
         <button
+          className="action-primary"
           disabled={!isComplete || !isHost}
           onClick={handleNext}
-          style={{
-            background: isComplete ? "var(--c-text-hi)" : "var(--c-surface-2)",
-            color: isComplete ? "var(--c-bg)" : "var(--c-text-md)",
-            border: "none",
-            borderRadius: "var(--r-full)",
-            padding: "var(--sp-4) var(--sp-8)",
-            fontSize: "var(--text-xl)",
-            fontWeight: 700,
-            cursor: isComplete && isHost ? "pointer" : "not-allowed",
-            transition: "all 0.2s",
-            opacity: !isHost && isComplete ? 0.5 : 1,
-          }}
         >
-          {isHost ? "Next" : "Waiting for Host..."}
+          {isHost ? "Make it yours" : "Waiting for host"}
+          <ArrowRight size={17} />
         </button>
-      </div>
-    </div>
+      </footer>
+    </section>
   );
 }

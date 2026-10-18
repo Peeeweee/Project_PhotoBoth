@@ -5,6 +5,10 @@ import { ArrowRight, Palette } from "lucide-react";
 import { useSessionStore } from "../state/useSessionStore";
 import { useRoomStore } from "../state/useRoomStore";
 import { socket } from "../lib/socket";
+import { EDGE_STYLES, stripEdgeStyle } from "../lib/stripEdges";
+import { StripCanvas } from "../components/editor";
+import { getLayout } from "../data/stripLayouts";
+import { DESIGN_PACKS, ALL_DESIGNS } from "../data/themePacks";
 import { DesignPicker } from "../components/design";
 
 // ── Animation presets ──────────────────────────────────────────
@@ -20,6 +24,14 @@ const fadeUp: any = {
 export default function DesignSelect() {
   const navigate = useNavigate();
   const { designPreset, setDesignPreset, layoutId } = useSessionStore();
+  const layout = getLayout(layoutId);
+  const edge = EDGE_STYLES.find(
+    (e) => e.id === (designPreset?.edgeStyle ?? "square"),
+  )!;
+  const selectedPack = DESIGN_PACKS.find((pack) =>
+    pack.designs.some((d) => d.id === designPreset?.id),
+  );
+  const previewDesign = designPreset ?? ALL_DESIGNS[0];
   const { roomCode, selfId } = useRoomStore();
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState("");
@@ -75,7 +87,7 @@ export default function DesignSelect() {
         animate="show"
         style={{
           width: "100%",
-          maxWidth: 640,
+          maxWidth: 1180,
           display: "flex",
           flexDirection: "column",
           gap: "var(--sp-8)",
@@ -121,7 +133,7 @@ export default function DesignSelect() {
               lineHeight: "var(--lh-tight)",
             }}
           >
-            Pick a theme pack
+            Set the mood
           </h1>
           <p
             style={{
@@ -135,68 +147,169 @@ export default function DesignSelect() {
           </p>
         </motion.div>
 
-        {/* ── Picker ────────────────────────────────────────── */}
-        <motion.div variants={fadeUp}>
-          <DesignPicker
-            selectedId={designPreset?.id ?? null}
-            onSelect={setDesignPreset}
-          />
-        </motion.div>
+        <div className="design-config-grid">
+          <div className="design-config-options">
+            {/* ── Picker ────────────────────────────────────────── */}
+            <motion.div variants={fadeUp}>
+              <DesignPicker
+                selectedId={designPreset?.id ?? null}
+                onSelect={(preset) =>
+                  setDesignPreset({
+                    ...preset,
+                    edgeStyle: designPreset?.edgeStyle ?? "square",
+                  })
+                }
+              />
+            </motion.div>
 
-        {/* ── Actions ───────────────────────────────────────── */}
-        <motion.div
-          variants={fadeUp}
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginTop: "var(--sp-4)",
-          }}
-        >
-          <motion.button
-            variants={fadeUp}
-            disabled={!designPreset || isStarting}
-            onClick={handleNext}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "var(--sp-2)",
-              padding: "var(--sp-3) var(--sp-6)",
-              background: designPreset
-                ? "var(--c-accent)"
-                : "var(--c-surface-3)",
-              color: designPreset ? "var(--c-bg)" : "var(--c-text-lo)",
-              border: "none",
-              borderRadius: "var(--r-md)",
-              fontSize: "var(--text-sm)",
-              fontWeight: 600,
-              cursor: designPreset && !isStarting ? "pointer" : "not-allowed",
-              transition: "all 0.2s ease",
-            }}
-            whileHover={
-              designPreset && !isStarting ? { y: -1, scale: 1.02 } : {}
-            }
-            whileTap={designPreset && !isStarting ? { scale: 0.98 } : {}}
+            <section
+              className="edge-picker studio-card"
+              aria-labelledby="edge-heading"
+            >
+              <div>
+                <span className="studio-eyebrow">THE FINISHING TOUCH</span>
+                <h2 id="edge-heading">Find your edge</h2>
+                <p>
+                  Classic corners or a playful keepsake? These edges appear on
+                  your saved photos too.
+                </p>
+              </div>
+              <div className="edge-options">
+                {EDGE_STYLES.map((edge) => (
+                  <button
+                    key={edge.id}
+                    type="button"
+                    aria-pressed={
+                      (designPreset?.edgeStyle ?? "square") === edge.id
+                    }
+                    onClick={() =>
+                      setDesignPreset({
+                        ...(designPreset ?? {
+                          id: "solid-white",
+                          name: "Clean White",
+                          background: "#ffffff",
+                        }),
+                        edgeStyle: edge.id,
+                      })
+                    }
+                  >
+                    <span
+                      className="edge-sample"
+                      style={stripEdgeStyle(edge.id, 1, 65)}
+                    >
+                      <span />
+                    </span>
+                    <strong>{edge.name}</strong>
+                    <small>{edge.description}</small>
+                  </button>
+                ))}
+              </div>
+            </section>
+            {/* ── Actions ───────────────────────────────────────── */}
+            <motion.div
+              variants={fadeUp}
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginTop: "var(--sp-4)",
+              }}
+            >
+              <motion.button
+                variants={fadeUp}
+                disabled={!designPreset || isStarting}
+                onClick={handleNext}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "var(--sp-2)",
+                  padding: "var(--sp-3) var(--sp-6)",
+                  background: designPreset
+                    ? "var(--c-accent)"
+                    : "var(--c-surface-3)",
+                  color: designPreset ? "var(--c-bg)" : "var(--c-text-lo)",
+                  border: "none",
+                  borderRadius: "var(--r-md)",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 600,
+                  cursor:
+                    designPreset && !isStarting ? "pointer" : "not-allowed",
+                  transition: "all 0.2s ease",
+                }}
+                whileHover={
+                  designPreset && !isStarting ? { y: -1, scale: 1.02 } : {}
+                }
+                whileTap={designPreset && !isStarting ? { scale: 0.98 } : {}}
+              >
+                {isStarting ? (
+                  <>
+                    <span
+                      style={{
+                        animation: "spin 1s linear infinite",
+                        display: "inline-block",
+                      }}
+                    >
+                      ⟳
+                    </span>
+                    Starting…
+                  </>
+                ) : (
+                  <>
+                    Next step
+                    <ArrowRight size={18} strokeWidth={2.5} />
+                  </>
+                )}
+              </motion.button>
+            </motion.div>
+          </div>
+          <aside
+            className="design-live-preview studio-card"
+            aria-label="Live strip preview"
           >
-            {isStarting ? (
-              <>
-                <span
-                  style={{
-                    animation: "spin 1s linear infinite",
-                    display: "inline-block",
-                  }}
-                >
-                  ⟳
+            <div className="studio-card-heading">
+              <span>YOUR STRIP, YOUR STYLE</span>
+              <span className="studio-pill">Live preview</span>
+            </div>
+            <div className="design-preview-canvas">
+              <StripCanvas
+                layoutId={layoutId}
+                designId={previewDesign.id}
+                design={previewDesign}
+                title="Your memories"
+                showWatermark
+              />
+            </div>
+            <div className="design-preview-summary">
+              <div role="status" aria-live="polite" aria-atomic="true">
+                <span className="studio-eyebrow">
+                  {designPreset ? "YOU PICKED" : "MAKE IT YOURS"}
                 </span>
-                Starting…
-              </>
-            ) : (
-              <>
-                Next step
-                <ArrowRight size={18} strokeWidth={2.5} />
-              </>
-            )}
-          </motion.button>
-        </motion.div>
+                <h2>{designPreset?.name ?? "Choose a color or pattern"}</h2>
+                <p>
+                  {designPreset
+                    ? `${selectedPack?.name ?? "Your custom design"} · ${edge.name} edges`
+                    : "Tap a swatch to see it on your strip."}
+                </p>
+              </div>
+              <dl>
+                <div>
+                  <dt>Layout</dt>
+                  <dd>{layout.name}</dd>
+                </div>
+                <div>
+                  <dt>Photos</dt>
+                  <dd>{layout.slotCount} frames</dd>
+                </div>
+                <div>
+                  <dt>Edge</dt>
+                  <dd>{edge.name}</dd>
+                </div>
+              </dl>
+              <p className="studio-note">
+                Your photos will fill these frames after capture.
+              </p>
+            </div>
+          </aside>
+        </div>
       </motion.div>
     </div>
   );

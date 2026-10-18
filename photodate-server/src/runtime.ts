@@ -33,14 +33,15 @@ export function issue(roomId: string, participantId: string) {
     participantId,
     roomId,
   );
+  reserveParticipant(participantId);
   return token;
 }
 export function roomByCode(code: unknown) {
   assert(
-    typeof code === "string" && /^[A-Z]{5}$/.test(code.toUpperCase()),
+    typeof code === "string" && /^[A-Z]{5}$/.test(code.trim().toUpperCase()),
     "Invalid room code",
   );
-  const room = roomQueries.findByCode(code.toUpperCase());
+  const room = roomQueries.findByCode(code.trim().toUpperCase());
   assert(room, "Room not found", 404);
   assert(
     Date.parse(room.created_at) + RETENTION_HOURS * 3600000 > Date.now(),
@@ -78,6 +79,8 @@ export interface Document {
   frameCount: number;
   shotDeadlines: number[];
   readyParticipantIds: string[];
+  approvedParticipantIds: string[];
+  approvalRoster: string;
   expectedParticipantIds: string[];
   customDesign?: unknown;
 }
@@ -97,6 +100,8 @@ export function document(roomId: string): Document {
     frameCount: 4,
     shotDeadlines: [],
     readyParticipantIds: [],
+    approvedParticipantIds: [],
+    approvalRoster: "",
     expectedParticipantIds: [],
     ...(row ? JSON.parse(row.document) : {}),
   };
@@ -108,7 +113,7 @@ export function save(roomId: string, d: Document) {
   ).run(roomId, JSON.stringify(d));
 }
 export const online = new Map<string, Set<string>>();
-export function snapshot(roomId: string): RoomSnapshot {
+export function snapshot(roomId: string, includeCaptures = true): RoomSnapshot {
   const d = document(roomId);
   const room = roomQueries.findById(roomId);
   assert(room, "Room not found", 404);
@@ -117,8 +122,17 @@ export function snapshot(roomId: string): RoomSnapshot {
     participants: participantQueries
       .findByRoom(roomId)
       .map((p) => ({ ...p, online: !!online.get(p.id)?.size })),
-    captures: captureQueries.findByRoom(roomId),
+    captures: includeCaptures ? captureQueries.findByRoom(roomId) : undefined,
     ...d,
+    approvedParticipantIds:
+      d.approvalRoster ===
+      participantQueries
+        .findByRoom(roomId)
+        .map((p) => p.id)
+        .sort()
+        .join(",")
+        ? d.approvedParticipantIds
+        : [],
     serverTime: Date.now(),
   };
 }
@@ -130,7 +144,7 @@ export function complete(roomId: string) {
   const room = roomQueries.findById(roomId);
   if (room?.status !== "capturing") return;
   const rows = captureQueries
-    .findByRoom(roomId)
+    .metadataByRoom(roomId)
     .filter((c) => c.round_id === d.roundId);
   if (
     d.expectedParticipantIds.length &&
@@ -205,11 +219,22 @@ export function validateImage(value: unknown, maxBytes = 2 * 1024 * 1024) {
   );
   return value;
 }
-export function cleanup() {
-  db.prepare(
-    "DELETE FROM rooms WHERE julianday(created_at)<julianday('now',?)",
-  ).run(`-${RETENTION_HOURS} hours`);
+let lastCleanup = 0;
+export function cleanup(force = true) {
+  if (!force && Date.now() - lastCleanup < 60000) return;
+  lastCleanup = Date.now();
+  const expired = db
+    .prepare(
+      "SELECT id,host_id FROM rooms WHERE julianday(created_at)<julianday('now',?)",
+    )
+    .all(`-${RETENTION_HOURS} hours`) as { id: string; host_id: string }[];
+  for (const room of expired) {
+    // Notify and evict connected participants before cascading away the room.
+    removeParticipant(room.id, room.host_id);
+    roomQueries.delete(room.id);
+  }
 }
+
 const buckets = new Map<
   string,
   {
@@ -228,7 +253,16 @@ export function rate(key: string, limit = 120) {
   if (buckets.size > 10000)
     for (const [k, v] of buckets) if (v.until < now) buckets.delete(k);
 }
-export const layouts = ["2x1", "2x2", "3x1", "4x1", "wide-1", "collage"];
+export const layouts = [
+  "2x1",
+  "2x2",
+  "3x1",
+  "4x1",
+  "6x1",
+  "3x2",
+  "wide-1",
+  "collage",
+];
 export const designs = [
   "solid-white",
   "solid-black",
@@ -302,6 +336,11 @@ export function design(value: unknown) {
     typeof d.id === "string" && /^[\w-]{1,100}$/.test(d.id),
     "Invalid design id",
   );
+  assert(
+    d.edgeStyle === undefined ||
+      ["square", "rounded", "arch", "ticket", "postage"].includes(d.edgeStyle),
+    "Unknown frame edge",
+  );
   const background = text(d.background, 3000000);
   if (/url\(/i.test(background)) {
     const m =
@@ -315,6 +354,7 @@ export function design(value: unknown) {
     id: d.id,
     name: text(d.name, 100),
     background,
+    ...(d.edgeStyle !== undefined ? { edgeStyle: d.edgeStyle } : {}),
     ...(d.filterCss !== undefined
       ? { filterCss: patternCss(d.filterCss) }
       : {}),
@@ -329,6 +369,7 @@ export function editorDocument(value: unknown) {
     "placedStickers",
     "drawStrokes",
     "stripTitle",
+    "titlePosition",
     "filterId",
     "showWatermark",
     "designPreset",
@@ -369,7 +410,31 @@ export function editorDocument(value: unknown) {
     );
     out.filterId = e.filterId;
   }
-  if (e.stripTitle !== undefined) out.stripTitle = text(e.stripTitle, 200);
+  if (e.titlePosition !== undefined) {
+    const position = object(e.titlePosition);
+    assert(
+      [position.x, position.y].every(
+        (v) => typeof v === "number" && Number.isFinite(v) && v >= 5 && v <= 99,
+      ),
+      "Title position must be between 5 and 99 percent",
+    );
+    assert(
+      position.auto === undefined || typeof position.auto === "boolean",
+      "Invalid automatic title placement",
+    );
+    out.titlePosition = {
+      x: position.x,
+      y: position.y,
+      ...(position.auto !== undefined ? { auto: position.auto } : {}),
+    };
+  }
+  if (e.stripTitle !== undefined) {
+    assert(
+      typeof e.stripTitle === "string" && e.stripTitle.length <= 200,
+      "Title must be at most 200 characters",
+    );
+    out.stripTitle = e.stripTitle;
+  }
   if (e.title !== undefined) out.title = text(e.title, 200);
   if (e.showWatermark !== undefined) {
     assert(typeof e.showWatermark === "boolean", "Invalid watermark flag");
@@ -423,19 +488,17 @@ export function editorDocument(value: unknown) {
 }
 export function storageQuota(roomId: string, additional: number) {
   const row = db
-    .prepare(
-      "SELECT coalesce(sum(length(image_url)),0) n FROM captures WHERE room_id=?",
-    )
+    .prepare("SELECT bytes n FROM capture_storage WHERE scope=?")
     .get(roomId) as {
     n: number;
   };
   assert(
-    row.n + additional <= 64 * 1024 * 1024,
+    (row?.n ?? 0) + additional <= 64 * 1024 * 1024,
     "Room photo quota reached",
     413,
   );
   const total = db
-    .prepare("SELECT coalesce(sum(length(image_url)),0) n FROM captures")
+    .prepare("SELECT bytes n FROM capture_storage WHERE scope='*'")
     .get() as {
     n: number;
   };
@@ -444,4 +507,84 @@ export function storageQuota(roomId: string, additional: number) {
     "Server photo quota reached",
     503,
   );
+}
+
+/** A REST reservation and a disconnected member have the same bounded lease. */
+export const RECONNECT_GRACE_MS = Math.max(
+  100,
+  Number(process.env.RECONNECT_GRACE_MS) || 120000,
+);
+export function reserveParticipant(participantId: string) {
+  db.prepare(
+    "INSERT INTO participant_leases(participant_id,expires_at) VALUES(?,?) ON CONFLICT(participant_id) DO UPDATE SET expires_at=excluded.expires_at",
+  ).run(participantId, Date.now() + RECONNECT_GRACE_MS);
+}
+export function markParticipantConnected(participantId: string) {
+  db.prepare(
+    "INSERT INTO participant_leases(participant_id,expires_at) VALUES(?,NULL) ON CONFLICT(participant_id) DO UPDATE SET expires_at=NULL",
+  ).run(participantId);
+}
+export function removeParticipant(roomId: string, participantId: string) {
+  const room = roomQueries.findById(roomId);
+  if (!room) return;
+  db.transaction(() => {
+    if (room.host_id === participantId) {
+      roomQueries.setStatus(roomId, "closed");
+      for (const member of participantQueries.findByRoom(roomId))
+        online.delete(member.id);
+      db.prepare(
+        "DELETE FROM participant_leases WHERE participant_id IN (SELECT id FROM participants WHERE room_id=?)",
+      ).run(roomId);
+    } else participantQueries.delete(participantId);
+    const d = document(roomId);
+    d.readyParticipantIds = d.readyParticipantIds.filter(
+      (id) => id !== participantId,
+    );
+    d.expectedParticipantIds = d.expectedParticipantIds.filter(
+      (id) => id !== participantId,
+    );
+    save(roomId, d);
+  }).immediate();
+  online.delete(participantId);
+  complete(roomId);
+  changed(roomId);
+}
+export function reclaimExpiredParticipants(now = Date.now()) {
+  const expired = db
+    .prepare(
+      "SELECT p.id,p.room_id FROM participant_leases l JOIN participants p ON p.id=l.participant_id JOIN rooms r ON r.id=p.room_id WHERE l.expires_at IS NOT NULL AND l.expires_at<=? AND r.status<>'closed'",
+    )
+    .all(now) as { id: string; room_id: string }[];
+  for (const p of expired)
+    if (!online.get(p.id)?.size) removeParticipant(p.room_id, p.id);
+}
+/** Run once on boot: clients may resume with the same credentials during grace. */
+export function recoverPresence() {
+  online.clear();
+  db.transaction(() => {
+    db.prepare(
+      "INSERT OR IGNORE INTO participant_leases(participant_id,expires_at) SELECT p.id,NULL FROM participants p JOIN rooms r ON r.id=p.room_id WHERE r.status<>'closed'",
+    ).run();
+    db.prepare(
+      "UPDATE participant_leases SET expires_at=? WHERE expires_at IS NULL",
+    ).run(Date.now() + RECONNECT_GRACE_MS);
+    const rooms = db
+      .prepare("SELECT id,status FROM rooms WHERE status<>'closed'")
+      .all() as { id: string; status: string }[];
+    for (const room of rooms) {
+      const d = document(room.id);
+      d.readyParticipantIds = [];
+      d.approvedParticipantIds = [];
+      if (room.status === "capturing") {
+        roomQueries.setStatus(room.id, "ready");
+        d.stage = "capture";
+        d.roundId = null;
+        d.expectedParticipantIds = [];
+        d.shotDeadlines = [];
+        captureQueries.deleteByRoom(room.id);
+      }
+      save(room.id, d);
+    }
+  }).immediate();
+  reclaimExpiredParticipants();
 }
