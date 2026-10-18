@@ -62,6 +62,35 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
     const guest = (
       await request(`/rooms/${code}/join`, { displayName: "Guest" })
     ).body;
+    const third = (
+      await request(`/rooms/${code}/join`, { displayName: "Third" })
+    ).body;
+    const fourth = (
+      await request(`/rooms/${code}/join`, { displayName: "Fourth" })
+    ).body;
+    assert.equal(
+      (await request(`/rooms/${code}/join`, { displayName: "Overflow" }))
+        .status,
+      409,
+    );
+    assert.equal(
+      (
+        await request(
+          `/rooms/${code}/leave`,
+          { reason: "fake reason" },
+          fourth.sessionToken,
+        )
+      ).status,
+      400,
+    );
+    assert.equal(
+      (await request(`/rooms/${code}/leave`, {}, fourth.sessionToken)).status,
+      200,
+    );
+    assert.equal(
+      (await request(`/rooms/${code}/leave`, {}, third.sessionToken)).status,
+      200,
+    );
     const hs = await socket(),
       gs = await socket(),
       attacker = await socket();
@@ -111,6 +140,77 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
         })
       ).ok,
       false,
+    );
+    const custom = {
+      aspectRatio: 1.5,
+      frames: [
+        { x: 8, y: 10, width: 30, height: 35, rotation: -10 },
+        { x: 55, y: 30, width: 30, height: 35, rotation: 10 },
+      ],
+    };
+    assert.equal(
+      (
+        await ack(gs, "update-room-selections", {
+          code,
+          layoutId: "custom",
+          designId: "solid-white",
+          customLayout: custom,
+        })
+      ).ok,
+      false,
+    );
+    assert.equal(
+      (
+        await ack(hs, "update-room-selections", {
+          code,
+          layoutId: "custom",
+          designId: "solid-white",
+          customLayout: custom,
+        })
+      ).ok,
+      true,
+    );
+    assert.equal(
+      (await ack(hs, "update-room-state", { code, status: "ready" })).ok,
+      true,
+    );
+    assert.deepEqual(
+      (await request(`/rooms/${code}`, undefined, host.sessionToken)).body
+        .editor.customLayout,
+      custom,
+    );
+    for (const device of [hs, gs]) {
+      await ack(device, "capture-ready", { code, ready: true });
+      await ack(device, "capture-approval", { code, approved: true });
+    }
+    assert.equal(
+      (
+        await ack(hs, "update-room-state", {
+          code,
+          status: "capturing",
+          frameCount: 1,
+        })
+      ).ok,
+      false,
+    );
+    assert.equal(
+      (
+        await ack(hs, "update-room-state", {
+          code,
+          status: "capturing",
+          frameCount: 2,
+        })
+      ).ok,
+      true,
+    );
+    const customRound = (
+      await request(`/rooms/${code}`, undefined, host.sessionToken)
+    ).body;
+    assert.deepEqual(customRound.editor.customLayout, custom);
+    assert.equal(customRound.frameCount, 2);
+    assert.equal(
+      (await ack(hs, "update-room-state", { code, status: "waiting" })).ok,
+      true,
     );
     assert.equal(
       (
@@ -337,7 +437,9 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
       ).ok,
       false,
     );
-    const approvalBroadcast = new Promise<any>((resolve) => gs.once("collaboration-changed", resolve));
+    const approvalBroadcast = new Promise<any>((resolve) =>
+      gs.once("collaboration-changed", resolve),
+    );
     assert.equal(
       (
         await ack(hs, "review-approval", {
@@ -504,6 +606,31 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
             assignedPhotos: [png],
             stripTitle: "Our night",
             titlePosition: { x: 25, y: 75 },
+            textLayers: [
+              {
+                id: "text-1",
+                text: "Hello crew",
+                x: 50,
+                y: 30,
+                width: 60,
+                fontSize: 72,
+                rotation: -10,
+                style: {
+                  font: "modern",
+                  size: 1,
+                  color: "#ffffff",
+                  bold: true,
+                  italic: false,
+                },
+              },
+            ],
+            titleStyle: {
+              font: "elegant",
+              size: 1.15,
+              color: "#9a446f",
+              bold: false,
+              italic: true,
+            },
           },
           stage: "filter",
         })
@@ -515,7 +642,17 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
       sessionToken: guest.sessionToken,
     });
     assert.equal(restored.snapshot.editor.title, "Shared");
+    assert.equal(restored.snapshot.editor.textLayers[0].text, "Hello crew");
+    assert.equal(restored.snapshot.editor.textLayers[0].fontSize, 72);
+    assert.equal(restored.snapshot.editor.textLayers[0].rotation, -10);
     assert.deepEqual(restored.snapshot.editor.titlePosition, { x: 25, y: 75 });
+    assert.deepEqual(restored.snapshot.editor.titleStyle, {
+      font: "elegant",
+      size: 1.15,
+      color: "#9a446f",
+      bold: false,
+      italic: true,
+    });
     assert.equal(
       (
         await ack(hs, "update-editor", {
@@ -590,7 +727,18 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
       code,
       sessionToken: guest.sessionToken,
     });
-    assert.equal((await ack(gs, "leave-room", { code })).ok, true);
+    const departureBroadcast = new Promise<any>((resolve) =>
+      hs.once("room-snapshot", resolve),
+    );
+    assert.equal(
+      (await ack(gs, "leave-room", { code, reason: "I need to go" })).ok,
+      true,
+    );
+    const departed = await departureBroadcast;
+    assert.equal(departed.messages.at(-1).kind, "departure");
+    assert.equal(departed.messages.at(-1).displayName, "Guest");
+    assert.equal(departed.messages.at(-1).reason, "I need to go");
+    assert.equal(departed.messages.at(-1).wasHost, false);
     assert.equal(
       io.sockets.sockets.get(guestDevice.id!)?.rooms.has(host.roomId),
       false,
@@ -626,6 +774,23 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
     }
     assert.equal((db.pragma("foreign_key_check") as unknown[]).length, 0);
     assert.equal(db.pragma("user_version", { simple: true }), 3);
+    const closedBroadcast = new Promise<any>((resolve) =>
+      hs.once("room-snapshot", resolve),
+    );
+    assert.equal(
+      (
+        await request(
+          `/rooms/${code}/leave`,
+          { reason: "Session finished" },
+          host.sessionToken,
+        )
+      ).status,
+      200,
+    );
+    const closed = await closedBroadcast;
+    assert.equal(closed.room.status, "closed");
+    assert.equal(closed.messages.at(-1).reason, "Session finished");
+    assert.equal(closed.messages.at(-1).wasHost, true);
   } finally {
     for (const s of sockets) s.disconnect();
     await new Promise<void>((resolve) => io.close(() => resolve()));
@@ -755,4 +920,72 @@ test("custom upload background syntax survives safe design serialization", () =>
       background: `url("${png}") center / cover no-repeat, url(https://evil.example)`,
     }),
   );
+});
+
+test("custom frame geometry rejects unsafe values, overflowing rotation and excessive counts", () => {
+  const { customLayout } = require("./runtime") as typeof import("./runtime");
+  const frame = { x: 20, y: 20, width: 30, height: 25, rotation: 20 };
+  assert.equal(
+    customLayout({ aspectRatio: 0.75, frames: [frame] }).frames[0].rotation,
+    20,
+  );
+  for (const value of [
+    { aspectRatio: 0, frames: [frame] },
+    { aspectRatio: 1, frames: [] },
+    { aspectRatio: 1, frames: Array(13).fill(frame) },
+    { aspectRatio: 1, frames: [{ ...frame, x: 0, y: 0, rotation: 45 }] },
+    { aspectRatio: 1, frames: [{ ...frame, rotation: NaN }] },
+  ])
+    assert.throws(() => customLayout(value));
+});
+
+test("caption typography accepts supported styles and rejects injected CSS or invalid sizes", () => {
+  const { editorDocument } = require("./runtime") as typeof import("./runtime");
+  const style = {
+    font: "modern",
+    size: 1,
+    color: "auto",
+    bold: true,
+    italic: false,
+  };
+  assert.deepEqual(editorDocument({ titleStyle: style }).titleStyle, style);
+  for (const patch of [
+    { font: "url(evil)" },
+    { size: 100 },
+    { size: NaN },
+    { color: "red;position:fixed" },
+    { bold: "true" },
+    { italic: null },
+  ])
+    assert.throws(() => editorDocument({ titleStyle: { ...style, ...patch } }));
+});
+
+test("text layers validate identities, bounds, text length and safe typography", () => {
+  const { editorDocument } = require("./runtime") as typeof import("./runtime");
+  const layer = {
+    id: "text-one",
+    text: "Hello",
+    x: 50,
+    y: 50,
+    width: 65,
+    fontSize: 72,
+    rotation: 0,
+    style: {
+      font: "modern",
+      size: 1,
+      color: "#ffffff",
+      bold: true,
+      italic: false,
+    },
+  };
+  assert.deepEqual(editorDocument({ textLayers: [layer] }).textLayers, [layer]);
+  for (const layers of [
+    Array(13).fill(layer),
+    [layer, layer],
+    [{ ...layer, x: -1 }],
+    [{ ...layer, fontSize: 10000 }],
+    [{ ...layer, text: "x".repeat(201) }],
+    [{ ...layer, style: { ...layer.style, font: "url(evil)" } }],
+  ])
+    assert.throws(() => editorDocument({ textLayers: layers }));
 });
