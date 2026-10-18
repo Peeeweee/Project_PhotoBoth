@@ -51,6 +51,12 @@ export default function DesignSelect() {
           designId: designPreset.id,
           customDesign: designPreset,
           customLayout: layoutId === "custom" ? customLayout : null,
+          keepsakeStyle: {
+            stripTitle: useSessionStore.getState().stripTitle,
+            titleStyle: useSessionStore.getState().titleStyle,
+            titlePosition: useSessionStore.getState().titlePosition,
+            filterId: useSessionStore.getState().filterId,
+          },
         },
         (ack) => {
           if (ack.ok) {

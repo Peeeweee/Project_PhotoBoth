@@ -1,3 +1,4 @@
+import TemplatePicker from "../components/layout/TemplatePicker";
 import CustomLayoutEditor from "../components/layout/CustomLayoutEditor";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -104,6 +105,7 @@ export default function LayoutSelect() {
 
         {/* ── Picker ────────────────────────────────────────── */}
         <motion.div variants={fadeUp}>
+          <TemplatePicker />
           <LayoutPicker
             selectedId={layoutId}
             onSelect={(layout) => setLayoutId(layout.id)}
