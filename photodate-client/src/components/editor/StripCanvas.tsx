@@ -1,3 +1,5 @@
+import TextLayers from "./TextLayers";
+import { DEFAULT_TITLE_STYLE, titleFont } from "../../data/textStyles";
 import { stripEdgeStyle } from "../../lib/stripEdges";
 import { designBackground } from "../design/designBackground";
 import React, { forwardRef, useRef, useState, useEffect } from "react";
@@ -22,6 +24,9 @@ export interface StripCanvasProps {
   renderSlot?: (index: number) => React.ReactNode;
   photoFilterCss?: string;
   title?: string;
+  editableText?: boolean;
+  selectedTextId?: string | null;
+  onTextSelect?: (id: string) => void;
   showWatermark?: boolean;
   children?: React.ReactNode;
 }
@@ -93,14 +98,22 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
       activeSlot,
       renderSlot,
       photoFilterCss = "none",
-      title = new Date().toLocaleDateString("en-CA").replace(/-/g, "."),
+      title: explicitTitle,
+      editableText = false,
+      selectedTextId,
+      onTextSelect,
       showWatermark = true,
       children,
     },
     ref,
   ) => {
+    const storedTitle = useSessionStore((state) => state.stripTitle);
+    const title = explicitTitle ?? storedTitle;
+    const titleStyle =
+      useSessionStore((state) => state.titleStyle) ?? DEFAULT_TITLE_STYLE;
     const titlePosition = useSessionStore((state) => state.titlePosition);
-    const layout = getLayout(layoutId);
+    const customLayout = useSessionStore((s) => s.customLayout);
+    const layout = getLayout(layoutId, customLayout);
     const customDesigns = useSessionStore((state) => state.customDesigns);
     const selectedDesign = useSessionStore((state) => state.designPreset);
     const candidate =
@@ -221,7 +234,7 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
               position: "relative",
               width: "100%",
               height: "100%",
-              display: "grid",
+              display: layout.id === "custom" ? "block" : "grid",
               gridTemplateColumns: `repeat(${layout.columns}, 1fr)`,
               gridTemplateRows: `repeat(${layout.rows}, 1fr)`,
               justifyContent: "center",
@@ -285,6 +298,20 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
                     width: "100%",
                     height: "100%",
                     boxShadow: "inset 0 0 10px rgba(0,0,0,0.1)",
+                    ...(slot.free
+                      ? {
+                          position: "absolute",
+                          left: `${slot.free.x}%`,
+                          top: `${slot.free.y}%`,
+                          width: `${slot.free.width}%`,
+                          height: `${slot.free.height}%`,
+                          transform: `rotate(${slot.free.rotation}deg)`,
+                          transformOrigin: "center",
+                          border: "6px solid rgba(255,255,255,.85)",
+                          boxSizing: "border-box",
+                          boxShadow: "0 6px 18px #0003",
+                        }
+                      : {}),
                     cursor: isClickable ? "pointer" : "default",
                   }}
                 >
@@ -348,12 +375,18 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
                 }}
               />
             )}
+            <TextLayers
+              editable={editableText}
+              selectedId={selectedTextId}
+              onSelect={onTextSelect}
+              autoColor={darkBackground ? "#fffaf4" : "#333333"}
+            />
             {/* Footer Branding Area */}
             {title && (
               <div
                 style={{
                   position: "absolute",
-                  top: `${titlePosition.auto ? 100 - (layout.bottomPaddingFraction ?? layout.paddingFraction) * layout.stripAspectRatio * 50 : titlePosition.y}%`,
+                  top: `${titlePosition.auto ? (layout.id === "custom" ? 95 : 100 - (layout.bottomPaddingFraction ?? layout.paddingFraction) * layout.stripAspectRatio * 50) : titlePosition.y}%`,
                   left: `${titlePosition.x}%`,
                   width: "80%",
                   display: "flex",
@@ -362,7 +395,10 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
                   justifyContent: "center",
                   padding: "0 8%",
                   color: darkBackground ? "#fffaf4" : "#333",
-                  fontSize: "60px", // 6% of internal width (1000px)
+                  fontSize:
+                    layout.id === "custom"
+                      ? `${Math.min(40, 30 / layout.stripAspectRatio)}px`
+                      : "60px",
                   lineHeight: 1.2,
                   fontFamily: "monospace",
                   zIndex: 5,
@@ -377,7 +413,22 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
                     PhotoDate
                   </span>
                 )}
-                <span style={{ fontSize: "0.8em", opacity: 0.8 }}>{title}</span>
+                <span
+                  data-caption-text="true"
+                  style={{
+                    fontSize: `${0.8 * titleStyle.size}em`,
+                    opacity: 1,
+                    fontFamily: titleFont(titleStyle.font),
+                    fontWeight: titleStyle.bold ? 700 : 400,
+                    fontStyle: titleStyle.italic ? "italic" : "normal",
+                    color:
+                      titleStyle.color === "auto"
+                        ? undefined
+                        : titleStyle.color,
+                  }}
+                >
+                  {title}
+                </span>
               </div>
             )}
 
