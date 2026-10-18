@@ -212,70 +212,90 @@ export default function CaptureRoom() {
             {activeCapture
               ? index >= shotDeadlines.length
                 ? "Beautiful. Saving your moments."
-                : "Make a little memory."
-              : "A good moment starts here."}
+                : "A little pose. A little magic."
+              : "Your moment. Your crew."}
           </h1>
           <p>
             {activeCapture
               ? "Follow the countdown, switch up your pose, and have fun."
-              : "Find your light, gather your people, and tell us when you’re ready."}
+              : "Find your light. Get comfortable. We’ll capture the rest."}
           </p>
         </div>
         <span className="studio-room-tag">
           ROOM <strong>{roomCode}</strong>
         </span>
       </header>
+      <nav className="capture-steps" aria-label="Session progress">
+        <span className={!activeCapture ? "is-active" : "is-done"}>
+          <b>{activeCapture ? "✓" : "01"}</b> Get ready
+        </span>
+        <span className={activeCapture ? "is-active" : ""}>
+          <b>02</b> Strike a pose
+        </span>
+        <span>
+          <b>03</b> Make it yours
+        </span>
+        <small>
+          {layout.name} · {shotCount} shots
+        </small>
+      </nav>
       <div className="capture-studio-grid">
         <div className="capture-main">
           <div className="camera-card studio-card">
             <div className="studio-card-heading">
               <span>
                 <Camera size={17} />
-                {activeCapture ? "In the moment" : "Your camera preview"}
+                {activeCapture
+                  ? "You’re in the spotlight"
+                  : "Find your best angle"}
               </span>
               <span className={`studio-pill ${ready ? "is-ready" : ""}`}>
                 {ready ? "Camera ready" : "Connecting camera"}
               </span>
             </div>
-            <div
-              className="capture-preview studio-camera-frame"
-              style={{
-                width: `min(100%, calc(var(--camera-preview-height, 420px) * ${cameraAspect}))`,
-                aspectRatio: String(cameraAspect),
-                maxHeight: "none",
-                minHeight: 0,
-                marginInline: "auto",
-              }}
-            >
-              {flashShot > 0 && (
-                <div
-                  key={flashShot}
-                  className="shutter-flash"
-                  aria-hidden="true"
+            <div className="camera-stage">
+              <div
+                className="capture-preview studio-camera-frame"
+                style={{
+                  width: `min(100%, calc(var(--camera-preview-height, 420px) * ${cameraAspect}))`,
+                  aspectRatio: String(cameraAspect),
+                  maxHeight: "none",
+                  minHeight: 0,
+                  marginInline: "auto",
+                }}
+              >
+                {flashShot > 0 && (
+                  <div
+                    key={flashShot}
+                    className="shutter-flash"
+                    aria-hidden="true"
+                  />
+                )}
+                <CameraView
+                  isActive
+                  participants={participants}
+                  selfId={selfId ?? undefined}
+                  isCountingDown={counting}
+                  timerSeconds={remaining}
+                  shotDeadline={shotDeadlines[index]}
+                  frameIndex={index}
+                  roundId={roundId}
+                  captureAspectRatio={cameraAspect}
+                  allowCameraSwitch={!activeCapture}
+                  preserveSourceAspect={layout.mixed}
+                  onStream={setCameraStream}
+                  onCountdownChange={setLiveCount}
+                  onCapture={capture}
+                  onReady={onReady}
+                  onError={setError}
                 />
-              )}
-              <CameraView
-                isActive
-                participants={participants}
-                selfId={selfId ?? undefined}
-                isCountingDown={counting}
-                timerSeconds={remaining}
-                shotDeadline={shotDeadlines[index]}
-                frameIndex={index}
-                roundId={roundId}
-                captureAspectRatio={cameraAspect}
-                allowCameraSwitch={!activeCapture}
-                preserveSourceAspect={layout.mixed}
-                onStream={setCameraStream}
-                onCountdownChange={setLiveCount}
-                onCapture={capture}
-                onReady={onReady}
-                onError={setError}
-              />
+              </div>
             </div>
             <div className="camera-card-caption">
-              <span className="live-dot" /> Your camera stays on your device.
-              Everyone’s photos come together after capture.
+              <span className="live-dot" />
+              {participants.length > 1
+                ? "Your view · your crew’s photos join after capture"
+                : "Just you, your camera, and a little creativity"}
             </div>
           </div>
           <div className="shot-timeline studio-card" aria-label="Shot progress">
@@ -319,11 +339,11 @@ export default function CaptureRoom() {
             aria-label="Your strip taking shape"
           >
             <div className="studio-card-heading">
-              <span>✦ Your strip, coming to life</span>
+              <span>✦ The keepsake</span>
               <span className="studio-pill" aria-live="polite">
                 {index < shotCount
-                  ? `Next: frame ${index + 1}`
-                  : "Ready to review"}
+                  ? `${index + 1} / ${shotCount}`
+                  : "All captured"}
               </span>
             </div>
             <div className="capture-strip-preview">
@@ -351,10 +371,10 @@ export default function CaptureRoom() {
                 }
               />
             </div>
-            <p className="studio-note">
-              Your shots land in the highlighted frame. Everyone’s photos
-              combine after upload; choose or reorder them together next.
-            </p>
+            <div className="keepsake-caption">
+              <strong>{designPreset?.name ?? "Your chosen frame"}</strong>
+              <span>Pick your favorite order after the shots.</span>
+            </div>
           </section>
           {error && (
             <div className="studio-error" role="alert">
@@ -372,15 +392,15 @@ export default function CaptureRoom() {
           aria-labelledby="approval-heading"
         >
           <span className="studio-eyebrow">
-            <Users size={14} /> THE WHOLE CREW
+            <Users size={14} /> YOUR CREW
           </span>
           <h2 id="approval-heading">
-            {activeCapture ? "You’re making memories." : "Everyone in?"}
+            {activeCapture ? "Making memories." : "Ready together?"}
           </h2>
           <p>
             {activeCapture
-              ? "Keep this page open while your photos upload. We’ll take you to your camera roll together."
-              : "A little check-in before we start. Each person approves from their own device."}
+              ? "Stay here until everyone’s photos finish uploading."
+              : "Each person taps ready on their own device."}
           </p>
           <div className="crew-summary">
             <strong>
@@ -469,7 +489,7 @@ export default function CaptureRoom() {
               {isHost && (
                 <div className="host-launch">
                   <label id="countdown-label">
-                    <Clock3 size={15} /> Time to strike a pose
+                    <Clock3 size={15} /> Time between shots
                   </label>
                   <div
                     className="countdown-options"
