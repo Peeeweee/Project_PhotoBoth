@@ -455,12 +455,26 @@ body,#root { min-height:100vh; min-height:100dvh; height:auto; }
 @media(max-width:1100px) { .capture-studio { padding-inline:20px; } .capture-studio .capture-studio-grid { grid-template-columns:minmax(0,1fr) 250px; gap:14px; } .capture-studio .capture-main { grid-template-columns:minmax(0,1fr) 156px; gap:12px; } .capture-studio .camera-card { --camera-preview-height:clamp(240px,40svh,340px); } .capture-steps { gap:18px; } }
 @media(max-width:900px) { .capture-studio .capture-studio-grid { grid-template-columns:1fr; } .capture-studio .capture-main { grid-template-columns:minmax(0,1fr) 180px; } .capture-studio .crew-list { grid-template-columns:repeat(2,minmax(0,1fr)); } .capture-studio .capture-sidebar { max-width:none; } .capture-studio .host-launch { grid-template-columns:1fr 1fr; align-items:center; } .host-launch label,.host-launch > small { grid-column:1 / -1; } .capture-steps small { display:none; } }
 @media(max-width:600px) { .capture-studio { padding:18px 12px 28px; } .capture-studio .studio-heading { align-items:flex-start; gap:10px; } .capture-studio .studio-heading h1 { font-size:27px; } .capture-studio .studio-room-tag { display:grid; gap:5px; padding:10px; } .capture-steps { justify-content:space-between; gap:8px; margin-bottom:16px; padding:12px 0; } .capture-steps > span { font-size:10px; gap:6px; } .capture-steps b { width:21px; height:21px; } .capture-studio .capture-main { grid-template-columns:1fr; } .capture-studio .camera-card { --camera-preview-height:min(46svh,320px); } .capture-studio .camera-card-caption { font-size:10px; } .capture-studio .capture-keepsake { grid-column:1; grid-row:3; display:grid; grid-template-columns:130px minmax(0,1fr); min-height:190px; } .capture-keepsake .studio-card-heading { flex-direction:column; align-items:flex-start; justify-content:center; padding:16px; } .capture-studio .capture-strip-preview { grid-column:2; grid-row:1 / span 2; height:190px; min-height:0; margin:12px; } .keepsake-caption { grid-column:1; margin:0; padding:0 16px 16px; text-align:left; border:0; } .capture-studio .capture-sidebar { padding:18px; } .capture-studio .crew-list { grid-template-columns:1fr; } .capture-studio .host-launch { grid-template-columns:1fr; } .capture-studio .host-launch label,.capture-studio .host-launch > small { grid-column:auto; } }
-.capture-studio.has-wide-keepsake .capture-main { grid-template-columns:minmax(0,1fr); }
-.capture-studio.has-wide-keepsake .capture-keepsake { grid-column:1; grid-row:3; display:flex; flex-direction:column; min-height:0; }
+.capture-studio.has-wide-keepsake .capture-main { grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); }
+.capture-studio.has-wide-keepsake .capture-keepsake { grid-column:2; grid-row:1; display:flex; flex-direction:column; min-height:0; align-self:start; }
+.capture-studio.has-wide-keepsake .shot-timeline { grid-column:1 / -1; }
 .capture-studio.has-wide-keepsake .capture-strip-preview { flex:none; width:calc(100% - 32px); height:auto; min-height:0; max-height:300px; margin:0 16px; }
 .capture-studio.has-wide-keepsake .capture-keepsake .studio-card-heading { flex-direction:row; align-items:center; justify-content:space-between; padding:16px; }
 .capture-studio.has-wide-keepsake .keepsake-caption { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; margin-top:16px; border-top:1px solid var(--c-border); text-align:left; }
-@media(max-width:600px) { .capture-studio.has-wide-keepsake .capture-strip-preview { max-height:220px; } .capture-studio.has-wide-keepsake .keepsake-caption { flex-wrap:wrap; gap:6px; } }
+@media(max-width:600px) {
+  .capture-studio .capture-main,.capture-studio.has-wide-keepsake .capture-main { grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:8px; }
+  .capture-studio .camera-card { --camera-preview-height:220px; }
+  .capture-studio .camera-stage { margin:0 6px; }
+  .capture-studio .camera-card > .studio-card-heading { flex-wrap:wrap; padding:12px 10px; gap:6px; font-size:10px; }
+  .capture-studio .capture-keepsake,.capture-studio.has-wide-keepsake .capture-keepsake { grid-column:2; grid-row:1; display:flex; flex-direction:column; min-height:0; align-self:start; }
+  .capture-studio .capture-keepsake .studio-card-heading { flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:space-between; padding:12px 10px; font-size:10px; }
+  .capture-studio .capture-strip-preview { width:calc(100% - 16px); height:220px; min-height:0; margin:0 8px; flex:none; }
+  .capture-studio.has-wide-keepsake .capture-strip-preview { width:calc(100% - 16px); height:auto; min-height:0; max-height:220px; margin:0 8px; }
+  .capture-studio .keepsake-caption,.capture-studio.has-wide-keepsake .keepsake-caption { display:grid; text-align:left; gap:6px; padding:12px 10px; margin-top:12px; border-top:1px solid var(--c-border); }
+  .capture-studio .keepsake-caption span,.capture-studio .camera-card-caption { display:none; }
+  .capture-studio .shot-timeline { grid-column:1 / -1; }
+  .capture-studio .camera-switch { right:6px; top:6px; padding:6px; font-size:10px; }
+}
 @media(max-width:720px) { .review-together { grid-template-columns:1fr; gap:16px; } .review-decision,.review-chat,.capture-keepsake { padding:16px; } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
 @media (pointer:coarse) { button,input,select,textarea,[role="button"] { -webkit-tap-highlight-color:transparent; } button,select,input:not([type="range"]),.action-secondary,.action-primary { min-height:44px; } input,select,textarea { font-size:16px !important; } input[type="range"] { height:44px; } .photo-vote-controls button { min-width:44px; } .studio-text-button { padding:10px; } }
