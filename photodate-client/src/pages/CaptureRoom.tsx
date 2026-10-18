@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { socket } from "../lib/socket";
 import { uploadCapture } from "../lib/api";
 import { useRoomStore } from "../state/useRoomStore";
@@ -10,12 +11,15 @@ import {
   Sparkles,
   Users,
   ArrowRight,
+  ArrowLeft,
 } from "lucide-react";
 import { getLayout, slotAspectRatio } from "../data/stripLayouts";
 import { StripCanvas } from "../components/editor";
 import LiveSlot from "../components/capture/LiveSlot";
 import { CameraView } from "../components/capture";
 export default function CaptureRoom() {
+  const navigate = useNavigate();
+  const [changingSetup, setChangingSetup] = useState(false);
   const {
     roomCode,
     selfId,
@@ -203,6 +207,40 @@ export default function CaptureRoom() {
   };
   return (
     <section className="studio-page capture-studio">
+      {isHost && !activeCapture && (
+        <button
+          className="studio-text-button capture-back"
+          disabled={changingSetup || connectionStatus !== "joined"}
+          onClick={() => {
+            if (!roomCode || changingSetup) return;
+            setChangingSetup(true);
+            setError("");
+            socket
+              .timeout(8000)
+              .emit(
+                "update-room-state",
+                { code: roomCode, status: "waiting" },
+                (timeout, ack) => {
+                  setChangingSetup(false);
+                  if (timeout)
+                    setError(
+                      "Setup change was not confirmed. Reconnect to check the room.",
+                    );
+                  else if (!ack.ok) setError(ack.error.message);
+                  else {
+                    // Keep the chosen finish selected while the room resets its readiness.
+                    if (designPreset)
+                      useSessionStore.getState().setDesignPreset(designPreset);
+                    navigate("/layout");
+                  }
+                },
+              );
+          }}
+        >
+          <ArrowLeft size={16} />{" "}
+          {changingSetup ? "Returning to setup…" : "Change strip & frame"}
+        </button>
+      )}
       <header className="studio-heading">
         <div>
           <span className="studio-eyebrow">

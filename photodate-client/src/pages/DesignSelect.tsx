@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Palette } from "lucide-react";
+import { ArrowLeft, ArrowRight, Palette } from "lucide-react";
 import { useSessionStore } from "../state/useSessionStore";
 import { useRoomStore } from "../state/useRoomStore";
 import { socket } from "../lib/socket";
@@ -81,6 +81,13 @@ export default function DesignSelect() {
       }}
     >
       {error && <p role="alert">{error}</p>}
+      <button
+        className="studio-text-button capture-back"
+        onClick={() => navigate("/layout")}
+        disabled={isStarting}
+      >
+        <ArrowLeft size={16} /> Back to strips
+      </button>
       <motion.div
         variants={{ show: { transition: { staggerChildren: 0.1 } } }}
         initial="hidden"

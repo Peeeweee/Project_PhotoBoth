@@ -417,6 +417,7 @@ body,#root { min-height:100vh; min-height:100dvh; height:auto; }
 @keyframes studio-arrive { from { opacity:0; translate:0 6px; } to { opacity:1; translate:0 0; } }
 @keyframes frame-glow { 50% { outline-color:var(--c-text-hi); } }
 .capture-studio { width:min(1480px,100%); padding:24px 28px 36px; }
+.capture-back { display:inline-flex; align-items:center; gap:8px; min-height:44px; margin-bottom:12px; padding:8px 0; font-size:13px; text-align:left; }
 .capture-studio .studio-heading { margin-bottom:20px; align-items:center; }
 .capture-studio .studio-heading h1 { font-size:clamp(26px,2.7vw,38px); line-height:1.15; letter-spacing:-1.1px; margin:10px 0; }
 .capture-studio .studio-heading p { font-size:13px; margin:0; }
