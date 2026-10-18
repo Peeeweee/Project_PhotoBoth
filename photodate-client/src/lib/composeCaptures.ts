@@ -39,7 +39,7 @@ export async function composeCaptures(
         ),
       );
       const canvas = document.createElement("canvas");
-      const layout = getLayout(useSessionStore.getState().layoutId);
+      const layout = getLayout(useSessionStore.getState().layoutId, useSessionStore.getState().customLayout);
       const ratio = slotAspectRatio(layout, frame);
       canvas.width = ratio >= 1 ? 1200 : Math.round(1200 * ratio);
       canvas.height = ratio >= 1 ? Math.round(1200 / ratio) : 1200;
