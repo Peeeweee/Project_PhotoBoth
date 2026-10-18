@@ -28,6 +28,7 @@ export default function Layout({ children }: LayoutProps) {
   const navigateRef = useRef(navigate);
   navigateRef.current = navigate;
 
+  const [networkOnline, setNetworkOnline] = useState(navigator.onLine);
   const [connectionError, setConnectionError] = useState("");
   useEffect(() => {
     if (!roomCode || !selfId) {
@@ -266,6 +267,22 @@ export default function Layout({ children }: LayoutProps) {
         });
     };
     socket.on("collaboration-changed", collaboration);
+    const offline = () => setNetworkOnline(false);
+    window.addEventListener("offline", offline);
+    const resumeConnection = () => {
+      setNetworkOnline(navigator.onLine);
+      if (
+        isCurrent() &&
+        document.visibilityState !== "hidden" &&
+        useRoomStore.getState().status !== "closed" &&
+        !socket.connected
+      ) {
+        useRoomStore.setState({ connectionStatus: "connecting" });
+        socket.connect();
+      }
+    };
+    window.addEventListener("online", resumeConnection);
+    document.addEventListener("visibilitychange", resumeConnection);
     socket.on("connect", join);
     socket.on("disconnect", disconnected);
     socket.on("connect_error", connectionFailed);
@@ -278,6 +295,9 @@ export default function Layout({ children }: LayoutProps) {
       clearTimeout(debounce);
       unsubscribe();
       socket.off("collaboration-changed", collaboration);
+      window.removeEventListener("offline", offline);
+      window.removeEventListener("online", resumeConnection);
+      document.removeEventListener("visibilitychange", resumeConnection);
       socket.off("connect", join);
       socket.off("disconnect", disconnected);
       socket.off("connect_error", connectionFailed);
@@ -406,37 +426,46 @@ export default function Layout({ children }: LayoutProps) {
           transition: "background var(--dur-slow)",
         }}
       >
-        {!roomClosed && connectionStatus !== "joined" && roomCode && (
-          <div
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              background: "var(--c-error)",
-              color: "white",
-              padding: "var(--sp-2)",
-              textAlign: "center",
-              fontSize: "var(--text-xs)",
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "var(--sp-2)",
-              zIndex: 10,
-            }}
-          >
-            <RefreshCw
-              size={14}
-              style={{ animation: "spin 2s linear infinite" }}
-            />
-            {connectionStatus === "joining"
-              ? "Joining your room…"
-              : connectionStatus === "error"
-                ? "Room connection needs attention."
-                : "Connecting to the server…"}
+        {!networkOnline && roomCode && !roomClosed && (
+          <div className="offline-notice" role="status">
+            You’re offline. Keep this tab open, reconnect, and retry any pending
+            photo uploads.
           </div>
         )}
+        {networkOnline &&
+          !roomClosed &&
+          connectionStatus !== "joined" &&
+          roomCode && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                background: "var(--c-error)",
+                color: "white",
+                padding: "var(--sp-2)",
+                textAlign: "center",
+                fontSize: "var(--text-xs)",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "var(--sp-2)",
+                zIndex: 10,
+              }}
+            >
+              <RefreshCw
+                size={14}
+                style={{ animation: "spin 2s linear infinite" }}
+              />
+              {connectionStatus === "joining"
+                ? "Joining your room…"
+                : connectionStatus === "error"
+                  ? "Room connection needs attention."
+                  : "Connecting to the server…"}
+            </div>
+          )}
         {!roomClosed && connectionError && (
           <div
             role="alert"

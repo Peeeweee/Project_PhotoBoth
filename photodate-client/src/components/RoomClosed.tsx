@@ -1,3 +1,4 @@
+import { exportPixelRatio } from "../lib/deviceSupport";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Download, Heart, ArrowRight } from "lucide-react";
@@ -79,8 +80,11 @@ export default function RoomClosed() {
                 await waitForExport(node);
                 const { toPng } = await import("html-to-image");
                 const url = await toPng(node, {
-                  pixelRatio:
-                    3200 / Math.max(node.offsetWidth, node.offsetHeight),
+                  pixelRatio: exportPixelRatio(
+                    node.offsetWidth,
+                    node.offsetHeight,
+                    window.matchMedia("(pointer: coarse)").matches,
+                  ),
                   skipFonts: true,
                 });
                 const link = document.createElement("a");

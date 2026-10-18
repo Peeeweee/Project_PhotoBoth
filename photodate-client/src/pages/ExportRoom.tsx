@@ -1,3 +1,9 @@
+import { useEffect } from "react";
+import {
+  dataUrlFile,
+  exportPixelRatio,
+  canShareFile,
+} from "../lib/deviceSupport";
 import { waitForExport } from "../lib/exportReady";
 import { publishStage } from "../lib/session";
 import { useState } from "react";
@@ -32,7 +38,39 @@ export default function ExportRoom() {
     url: string;
     name: string;
     format: string;
+    file: File;
+    openUrl: string;
   } | null>(null);
+  useEffect(
+    () => () => {
+      if (lastExport) URL.revokeObjectURL(lastExport.openUrl);
+    },
+    [lastExport],
+  );
+  const rememberExport = (url: string, name: string, format: string) => {
+    const file = dataUrlFile(url, name);
+    setLastExport({
+      url,
+      name,
+      format,
+      file,
+      openUrl: URL.createObjectURL(file),
+    });
+  };
+  const shareExport = async () => {
+    if (!lastExport) return;
+    try {
+      await navigator.share({
+        files: [lastExport.file],
+        title: stripTitle || "PhotoDate",
+      });
+    } catch (error) {
+      if (!(error instanceof Error && error.name === "AbortError"))
+        setExportError(
+          "Sharing is unavailable here. Use Open file or Download instead.",
+        );
+    }
+  };
   const [isExporting, setIsExporting] = useState<string | null>(null);
 
   const designId = designPreset?.id || "classic";
@@ -51,7 +89,11 @@ export default function ExportRoom() {
       if (!node) throw new Error("Strip not found");
       await waitForExport(node);
 
-      const pixelRatio = 3200 / Math.max(node.offsetWidth, node.offsetHeight);
+      const pixelRatio = exportPixelRatio(
+        node.offsetWidth,
+        node.offsetHeight,
+        window.matchMedia("(pointer: coarse)").matches,
+      );
       let dataUrl: string;
       if (format === "png")
         dataUrl = await toPng(node, { pixelRatio, skipFonts: true });
@@ -69,7 +111,7 @@ export default function ExportRoom() {
       const link = document.createElement("a");
       link.download = `${stripTitle || "photodate"}.${format}`;
       link.href = dataUrl;
-      setLastExport({ url: dataUrl, name: link.download, format });
+      rememberExport(dataUrl, link.download, format);
       link.click();
     } catch (e) {
       setExportError(
@@ -93,7 +135,11 @@ export default function ExportRoom() {
       if (!node) throw new Error("Strip not found");
       await waitForExport(node);
 
-      const pixelRatio = 3200 / Math.max(node.offsetWidth, node.offsetHeight);
+      const pixelRatio = exportPixelRatio(
+        node.offsetWidth,
+        node.offsetHeight,
+        window.matchMedia("(pointer: coarse)").matches,
+      );
       const dataUrl = await toPng(node, { pixelRatio, skipFonts: true });
 
       const img = new Image();
@@ -116,11 +162,7 @@ export default function ExportRoom() {
         "FAST",
       );
       const filename = `${stripTitle || "photodate"}.pdf`;
-      setLastExport({
-        url: pdf.output("datauristring"),
-        name: filename,
-        format: "pdf",
-      });
+      rememberExport(pdf.output("datauristring"), filename, "pdf");
       pdf.save(filename);
     } catch (e) {
       setExportError(
@@ -133,6 +175,7 @@ export default function ExportRoom() {
 
   return (
     <div
+      className="export-workspace"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -162,10 +205,30 @@ export default function ExportRoom() {
           )}
           <span>
             Your {lastExport.format.toUpperCase()} is ready.{" "}
-            <a href={lastExport.url} download={lastExport.name}>
+            <a href={lastExport.openUrl} download={lastExport.name}>
               Download again
             </a>
           </span>
+          <a
+            className="action-secondary"
+            href={lastExport.openUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open file
+          </a>
+          {canShareFile(lastExport.file) && (
+            <button
+              className="action-primary"
+              onClick={() => void shareExport()}
+            >
+              Share / Save to Photos
+            </button>
+          )}
+          <p className="studio-note">
+            On a phone, use Share to save to Photos or Files. You can also open
+            the image and press and hold it.
+          </p>
         </div>
       )}
       <div

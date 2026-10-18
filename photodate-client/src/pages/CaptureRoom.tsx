@@ -67,7 +67,11 @@ export default function CaptureRoom() {
     frames.forEach((frame) => uploadedFrames.current.add(frame));
     setUploaded(uploadedFrames.current.size);
     setCounting(false);
-    if (changed) pending.current = [];
+    if (changed) {
+      pending.current = [];
+      capturedKeys.current.clear();
+      setError("");
+    }
   }, [roundId, captureResumeVersion]);
   useEffect(() => {
     if (status !== "capturing" || !ready || !shotDeadlines[index]) return;
@@ -75,6 +79,12 @@ export default function CaptureRoom() {
     setRemaining(Math.max(1, Math.ceil(delay / 1000)));
     setCounting(true);
   }, [status, ready, index, shotDeadlines]);
+  useEffect(() => {
+    if (status === "ready" && ready && roomCode && socket.connected)
+      socket.emit("capture-ready", { code: roomCode, ready: true }, (ack) => {
+        if (!ack.ok) setError(ack.error.message);
+      });
+  }, [status, roundId, ready, roomCode]);
   const capture = async (
     data: string,
     frame: number,
@@ -214,7 +224,7 @@ export default function CaptureRoom() {
             <div
               className="capture-preview studio-camera-frame"
               style={{
-                width: `min(100%, ${420 * cameraAspect}px)`,
+                width: `min(100%, calc(var(--camera-preview-height, 420px) * ${cameraAspect}))`,
                 aspectRatio: String(cameraAspect),
                 maxHeight: "none",
                 minHeight: 0,
@@ -238,6 +248,7 @@ export default function CaptureRoom() {
                 frameIndex={index}
                 roundId={roundId}
                 captureAspectRatio={cameraAspect}
+                allowCameraSwitch={!activeCapture}
                 onCapture={capture}
                 onReady={onReady}
                 onError={setError}
@@ -458,6 +469,29 @@ export default function CaptureRoom() {
               {index < shotDeadlines.length
                 ? `Shot ${Math.min(index + 1, shotDeadlines.length)} of ${shotDeadlines.length}`
                 : "Finishing uploads…"}
+            </div>
+          )}
+          {activeCapture && isHost && (
+            <div className="round-recovery">
+              <button
+                className="action-secondary studio-wide"
+                onClick={() => {
+                  if (roomCode)
+                    socket.emit(
+                      "update-room-state",
+                      { code: roomCode, status: "ready" },
+                      (ack) => {
+                        if (!ack.ok) setError(ack.error.message);
+                      },
+                    );
+                }}
+              >
+                Restart this round
+              </button>
+              <p className="studio-note">
+                If someone misses a shot or switches apps, restart together.
+                Current round photos will be cleared.
+              </p>
             </div>
           )}
         </aside>

@@ -38,7 +38,7 @@ export default function FilterRoom() {
   const thumbPhoto = assignedPhotos[0] || "";
 
   return (
-    <div className="flex flex-col h-full p-4 gap-4">
+    <div className="filter-workspace flex flex-col p-4 gap-4">
       <div style={{ textAlign: "center", flexShrink: 0 }}>
         <h1
           style={{
@@ -62,7 +62,7 @@ export default function FilterRoom() {
       </div>
 
       {/* Top: Large Strip Preview */}
-      <div className="flex-1 flex justify-center items-center min-h-0 bg-[var(--c-surface-1)] rounded-[var(--r-lg)] p-4 md:p-8 overflow-hidden">
+      <div className="filter-preview relative flex-1 flex justify-center items-center min-h-0 bg-[var(--c-surface-1)] rounded-[var(--r-lg)] p-4 md:p-8 overflow-hidden">
         <div style={{ width: "100%", height: "100%", position: "relative" }}>
           <StripCanvas
             layoutId={layoutId}

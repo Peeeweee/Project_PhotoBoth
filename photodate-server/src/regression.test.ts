@@ -433,6 +433,39 @@ test("authenticated multiplayer lifecycle, malformed input, retries, retakes and
         .status,
       409,
     );
+    const restarted = await ack(hs, "update-room-state", {
+      code,
+      status: "ready",
+    });
+    assert.equal(restarted.ok, true);
+    assert.equal(restarted.snapshot.roundId, null);
+    assert.equal(restarted.snapshot.shotDeadlines.length, 0);
+    assert.equal(restarted.snapshot.approvedParticipantIds.length, 0);
+    assert.equal(restarted.snapshot.captures.length, 0);
+    assert.equal(
+      (
+        await ack(hs, "update-room-state", {
+          code,
+          status: "capturing",
+          frameCount: 1,
+        })
+      ).ok,
+      false,
+    );
+    for (const s of [hs, gs]) {
+      await ack(s, "capture-ready", { code, ready: true });
+      await ack(s, "capture-approval", { code, approved: true });
+    }
+    assert.equal(
+      (
+        await ack(hs, "update-room-state", {
+          code,
+          status: "capturing",
+          frameCount: 1,
+        })
+      ).ok,
+      true,
+    );
     const guestDevice = await socket();
     await ack(guestDevice, "join-room", {
       code,

@@ -22,6 +22,10 @@ test("scheduled camera callbacks retain their original frame and fire at most on
   let cursor = 0,
     stateCursor = 0;
   const captured = [];
+  const documentMock = {
+    createElement: () => canvas,
+    visibilityState: "visible",
+  };
   const exports = {};
   const canvas = {
     width: 0,
@@ -34,7 +38,7 @@ test("scheduled camera callbacks retain their original frame and fire at most on
     Math,
     Date,
     Set,
-    document: { createElement: () => canvas },
+    document: documentMock,
     window: {
       setInterval: () => 1,
       clearInterval() {},
@@ -73,7 +77,7 @@ test("scheduled camera callbacks retain their original frame and fire at most on
   };
   render(0);
   refs[1].current = { readyState: 4, videoWidth: 1280, videoHeight: 720 };
-  effects[1]();
+  effects.at(-1)();
   render(1); // A newer render updates callback refs while the earlier timer is still queued.
   timers[0]();
   timers[0]();
@@ -81,6 +85,10 @@ test("scheduled camera callbacks retain their original frame and fire at most on
   assert.equal(captured[0].index, 0);
   assert.equal(captured[0].round, "round");
   assert.equal(canvas.width / canvas.height, 0.75);
+  effects.at(-1)(); // schedule frame 1
+  documentMock.visibilityState = "hidden";
+  timers.at(-1)();
+  assert.equal(captured.length, 1); // a backgrounded phone must not upload a stale frame
 });
 test("group composition fits the selected frame without cropping any participant image", async () => {
   const draws = [],

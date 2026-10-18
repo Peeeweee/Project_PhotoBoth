@@ -33,7 +33,7 @@ import {
 const transitions: Record<string, string[]> = {
   waiting: ["ready", "capturing"],
   ready: ["ready", "capturing", "waiting"],
-  capturing: ["reviewing", "waiting"],
+  capturing: ["reviewing", "waiting", "ready"],
   reviewing: ["editing", "capturing", "waiting"],
   editing: ["exporting", "capturing", "waiting", "ready"],
   exporting: ["closed", "capturing", "waiting", "ready"],
@@ -349,6 +349,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     if (p.status === "ready") {
       d.stage = "capture";
       d.roundId = null;
+      d.shotDeadlines = [];
       d.photoVotes = [];
       d.readyParticipantIds = [];
       d.approvedParticipantIds = [];
@@ -358,6 +359,7 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     }
     if (p.status === "waiting") {
       d.roundId = null;
+      d.shotDeadlines = [];
       d.photoVotes = [];
       d.readyParticipantIds = [];
       d.approvedParticipantIds = [];

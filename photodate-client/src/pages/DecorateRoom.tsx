@@ -83,7 +83,7 @@ export default function DecorateRoom() {
 
   return (
     <div
-      className="flex flex-col h-full p-4 gap-4"
+      className="decorate-workspace flex flex-col p-4 gap-4"
       onPointerDown={() => setSelectedStickerId(null)} // Deselect if clicking background
     >
       <div style={{ textAlign: "center", flexShrink: 0 }}>
@@ -160,7 +160,7 @@ export default function DecorateRoom() {
         {!isHost && <p>The host edits the shared photo title.</p>}
       </fieldset>
       {/* Top: Large Strip Preview */}
-      <div className="relative flex-1 flex justify-center items-center min-h-0 bg-[var(--c-surface-1)] rounded-[var(--r-lg)] p-4 md:p-8 overflow-hidden">
+      <div className="decorate-preview relative flex-1 flex justify-center items-center min-h-0 bg-[var(--c-surface-1)] rounded-[var(--r-lg)] p-4 md:p-8 overflow-hidden">
         <div style={{ width: "100%", height: "100%", position: "relative" }}>
           <StripCanvas
             layoutId={layoutId}
