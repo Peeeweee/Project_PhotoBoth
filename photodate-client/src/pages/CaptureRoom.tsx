@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { socket } from "../lib/socket";
 import { uploadCapture } from "../lib/api";
 import { useRoomStore } from "../state/useRoomStore";
@@ -11,15 +10,12 @@ import {
   Sparkles,
   Users,
   ArrowRight,
-  ArrowLeft,
 } from "lucide-react";
 import { getLayout, slotAspectRatio } from "../data/stripLayouts";
 import { StripCanvas } from "../components/editor";
 import LiveSlot from "../components/capture/LiveSlot";
 import { CameraView } from "../components/capture";
 export default function CaptureRoom() {
-  const navigate = useNavigate();
-  const [changingSetup, setChangingSetup] = useState(false);
   const {
     roomCode,
     selfId,
@@ -38,6 +34,12 @@ export default function CaptureRoom() {
   const [localShots, setLocalShots] = useState<string[]>([]);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [liveCount, setLiveCount] = useState<number | null>(null);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [deviceId, setDeviceId] = useState("");
+  const [cameraMirrored, setCameraMirrored] = useState(true);
+  const [orientation, setOrientation] = useState<
+    "auto" | "landscape" | "portrait"
+  >("auto");
   const columns = participants.length > 1 ? 2 : 1;
   const rows = Math.ceil(Math.max(1, participants.length) / columns);
   const capturedKeys = useRef(new Set<string>());
@@ -47,9 +49,15 @@ export default function CaptureRoom() {
   const [error, setError] = useState("");
   const [index, setIndex] = useState(0);
   const layout = getLayout(layoutId);
-  const cameraAspect =
+  const automaticAspect =
     (slotAspectRatio(layout, Math.min(index, layout.slotCount - 1)) * rows) /
     columns;
+  const cameraAspect =
+    orientation === "landscape"
+      ? 16 / 9
+      : orientation === "portrait"
+        ? 3 / 4
+        : automaticAspect;
   const [counting, setCounting] = useState(false);
   const [remaining, setRemaining] = useState(3);
   const [uploaded, setUploaded] = useState(0);
@@ -61,6 +69,7 @@ export default function CaptureRoom() {
   roundRef.current = roundId;
   const onReady = useCallback((value: boolean) => {
     setReady(value);
+    if (value && pending.current.length === 0) setError("");
     useRoomStore.setState({ cameraReady: value });
     const code = useRoomStore.getState().roomCode;
     if (code && socket.connected)
@@ -209,40 +218,6 @@ export default function CaptureRoom() {
     <section
       className={`studio-page capture-studio${layout.stripAspectRatio >= 1 ? " has-wide-keepsake" : ""}`}
     >
-      {isHost && !activeCapture && (
-        <button
-          className="studio-text-button capture-back"
-          disabled={changingSetup || connectionStatus !== "joined"}
-          onClick={() => {
-            if (!roomCode || changingSetup) return;
-            setChangingSetup(true);
-            setError("");
-            socket
-              .timeout(8000)
-              .emit(
-                "update-room-state",
-                { code: roomCode, status: "waiting" },
-                (timeout, ack) => {
-                  setChangingSetup(false);
-                  if (timeout)
-                    setError(
-                      "Setup change was not confirmed. Reconnect to check the room.",
-                    );
-                  else if (!ack.ok) setError(ack.error.message);
-                  else {
-                    // Keep the chosen finish selected while the room resets its readiness.
-                    if (designPreset)
-                      useSessionStore.getState().setDesignPreset(designPreset);
-                    navigate("/layout");
-                  }
-                },
-              );
-          }}
-        >
-          <ArrowLeft size={16} />{" "}
-          {changingSetup ? "Returning to setup…" : "Change strip & frame"}
-        </button>
-      )}
       <header className="studio-heading">
         <div>
           <span className="studio-eyebrow">
@@ -293,6 +268,61 @@ export default function CaptureRoom() {
                 {ready ? "Camera ready" : "Connecting camera"}
               </span>
             </div>
+            <div className="camera-settings">
+              <label>
+                Camera
+                <select
+                  value={deviceId}
+                  disabled={activeCapture}
+                  onChange={(e) => setDeviceId(e.target.value)}
+                  aria-label="Choose built-in or external camera"
+                >
+                  <option value="">Automatic / front or rear</option>
+                  {deviceId &&
+                    !devices.some((d) => d.deviceId === deviceId) && (
+                      <option value={deviceId}>
+                        Camera disconnected — choose another
+                      </option>
+                    )}
+                  {devices
+                    .filter((d) => d.deviceId)
+                    .map((d, i) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Camera ${i + 1}`}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <fieldset disabled={activeCapture}>
+                <legend>Framing</legend>
+                <div className="camera-orientations">
+                  {(["auto", "landscape", "portrait"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={orientation === mode}
+                      onClick={() => {
+                        if (orientation === mode) return;
+                        onReady(false);
+                        setOrientation(mode);
+                        onReady(ready);
+                      }}
+                    >
+                      {mode === "auto"
+                        ? "Auto"
+                        : mode === "landscape"
+                          ? "Landscape"
+                          : "Portrait"}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <p>
+                Connect a USB camera or capture card, then select it here.
+                Camera names appear after permission. Framing changes your
+                photo; the chosen strip stays the same and fits the result.
+              </p>
+            </div>
             <div className="camera-stage">
               <div
                 className="capture-preview studio-camera-frame"
@@ -322,7 +352,10 @@ export default function CaptureRoom() {
                   roundId={roundId}
                   captureAspectRatio={cameraAspect}
                   allowCameraSwitch={!activeCapture}
-                  preserveSourceAspect={layout.mixed}
+                  preserveSourceAspect={orientation === "auto" && layout.mixed}
+                  deviceId={deviceId}
+                  onDevices={setDevices}
+                  onMirroredChange={setCameraMirrored}
                   onStream={setCameraStream}
                   onCountdownChange={setLiveCount}
                   onCapture={capture}
@@ -413,7 +446,11 @@ export default function CaptureRoom() {
                   ready &&
                   slot === index &&
                   index < shotCount ? (
-                    <LiveSlot stream={cameraStream} count={liveCount} />
+                    <LiveSlot
+                      stream={cameraStream}
+                      count={liveCount}
+                      mirrored={cameraMirrored}
+                    />
                   ) : null
                 }
               />
