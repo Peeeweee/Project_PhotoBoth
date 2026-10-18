@@ -5,6 +5,7 @@ import "./branding.css";
 import "./motion.css";
 import "./photoStyles.css";
 import "./studioThemes.css";
+import "./roomExperience.css";
 import App from "./App.tsx";
 import { MotionConfig } from "framer-motion";
 
