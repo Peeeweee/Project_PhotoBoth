@@ -41,6 +41,57 @@ const {
 const { default: db } = require("../../photodate-server/dist/db.js");
 after(() => db.close());
 
+test("occasion templates reference available layouts, designs and filters", () => {
+  const textStyles = catalog("../src/data/textStyles.ts");
+  const { KEEPSAKE_TEMPLATES } = catalog("../src/data/keepsakeTemplates.ts", {
+    "./textStyles": textStyles,
+  });
+  const { FILTER_PRESETS } = catalog("../src/data/filterPresets.ts");
+  assert.equal(KEEPSAKE_TEMPLATES.length, 8);
+  assert.equal(new Set(KEEPSAKE_TEMPLATES.map((t) => t.id)).size, 8);
+  for (const template of KEEPSAKE_TEMPLATES) {
+    assert.ok(
+      AVAILABLE_LAYOUTS.some((l) => l.id === template.layoutId),
+      template.id,
+    );
+    assert.ok(
+      ALL_DESIGNS.some((d) => d.id === template.designId),
+      template.id,
+    );
+    assert.ok(
+      FILTER_PRESETS.some((f) => f.id === template.filterId),
+      template.id,
+    );
+    assert.ok(template.title.length > 0);
+  }
+});
+
+test("photo adjustments preserve the source and clamp dragging inside supported bounds", () => {
+  const { DEFAULT_PHOTO_EDIT, photoPresentation, panPhoto } = catalog(
+    "../src/lib/photoEdit.ts",
+  );
+  const initial = { ...DEFAULT_PHOTO_EDIT, fit: "cover", zoom: 2 };
+  const moved = panPhoto(initial, 20, -10, 200, 100);
+  assert.equal(moved.x, -10);
+  assert.equal(moved.y, 10);
+  assert.equal(initial.x, 0);
+  assert.equal(photoPresentation(moved).objectPosition, "40% 60%");
+  assert.equal(photoPresentation(moved).transform, "scale(2)");
+  const clamped = panPhoto(initial, 9999, -9999, 0, 0);
+  assert.equal(clamped.x, -50);
+  assert.equal(clamped.y, 50);
+  assert.equal(photoPresentation().objectFit, "contain");
+  assert.throws(() =>
+    editorDocument({ photoEdits: [{ fit: "cover", zoom: 4, x: 0, y: 0 }] }),
+  );
+  assert.throws(() =>
+    editorDocument({ photoEdits: [{ fit: "stretch", zoom: 1, x: 0, y: 0 }] }),
+  );
+  assert.doesNotThrow(() =>
+    editorDocument({ photoEdits: [moved], photoSources: [1, null] }),
+  );
+});
+
 test("all studio themes apply distinct readable UI palettes and clear old inline overrides", () => {
   const styles = catalog("../src/data/photoStyles.ts");
   const studio = catalog("../src/data/studioThemes.ts");
