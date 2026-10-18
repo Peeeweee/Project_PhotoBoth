@@ -9,6 +9,8 @@ import { useRoomStore } from "../state/useRoomStore";
 import { useSessionStore } from "../state/useSessionStore";
 import { ThemePicker } from "../components/theme";
 import { DEFAULT_THEME } from "../data/themes";
+import { getPhotoStyle } from "../data/photoStyles";
+import { ALL_DESIGNS } from "../data/themePacks";
 import type { ThemeDefinition } from "../data/themes";
 
 // ── Motion presets ───────────────────────────────────────────
@@ -249,6 +251,10 @@ export default function Landing() {
 
   const handleSelectTheme = (theme: ThemeDefinition) => {
     setThemePack(theme);
+    const style = getPhotoStyle(theme.id);
+    useSessionStore.getState().setFilterId(style.filterId);
+    const design = ALL_DESIGNS.find((d) => d.id === style.designId);
+    if (design) useSessionStore.getState().setDesignPreset(design);
   };
 
   // ── Create room ────────────────────────────────────────────
@@ -264,8 +270,14 @@ export default function Landing() {
         isGroupMode: useSessionStore.getState().isGroupMode,
       };
       leaveSession();
-      if (preferences.themePack)
-        useSessionStore.getState().setThemePack(preferences.themePack);
+      const chosen = getPhotoStyle(preferences.themePack?.id);
+      useSessionStore
+        .getState()
+        .setThemePack(preferences.themePack ?? DEFAULT_THEME);
+      useSessionStore.getState().setFilterId(chosen.filterId);
+      const initialDesign = ALL_DESIGNS.find((d) => d.id === chosen.designId);
+      if (initialDesign)
+        useSessionStore.getState().setDesignPreset(initialDesign);
       useSessionStore.getState().setGroupMode(preferences.isGroupMode);
       setRoom({
         sessionToken: data.sessionToken,
@@ -336,6 +348,7 @@ export default function Landing() {
 
   return (
     <div
+      className="brand-landing"
       style={{
         minHeight: "100%",
         display: "flex",
@@ -360,6 +373,7 @@ export default function Landing() {
         {/* ── Hero ──────────────────────────────────────────── */}
         <motion.div
           variants={fadeUp}
+          className="brand-hero"
           style={{ textAlign: "center", paddingTop: "var(--sp-4)" }}
         >
           <div
@@ -384,7 +398,7 @@ export default function Landing() {
                 letterSpacing: "1px",
               }}
             >
-              PHOTOBOOTH FOR TWO
+              A LITTLE CLOSER, FROM ANYWHERE
             </span>
           </div>
           <h1
@@ -422,6 +436,7 @@ export default function Landing() {
         {/* ── Action cards ───────────────────────────────────── */}
         <motion.div
           variants={fadeUp}
+          className="brand-entry-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
@@ -430,6 +445,7 @@ export default function Landing() {
         >
           {/* Create a room */}
           <div
+            className="brand-entry-card"
             style={{
               padding: "var(--sp-5)",
               background: "var(--c-surface-1)",
@@ -543,6 +559,7 @@ export default function Landing() {
 
           {/* Join with a code */}
           <div
+            className="brand-entry-card"
             style={{
               padding: "var(--sp-5)",
               background: "var(--c-surface-1)",
