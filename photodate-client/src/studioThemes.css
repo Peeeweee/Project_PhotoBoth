@@ -1,0 +1,152 @@
+.brand-experiment body {
+  background: var(--c-bg);
+}
+.brand-experiment .app-shell > header {
+  background: var(--c-bg) !important;
+  border-color: var(--c-border-soft) !important;
+}
+.brand-experiment .app-shell > header > div > span:first-child {
+  box-shadow: 0 0 18px var(--c-accent) !important;
+}
+.brand-experiment .brand-atmosphere {
+  background:
+    radial-gradient(ellipse at 50% 30%, var(--c-accent-soft), transparent 65%),
+    var(--c-bg);
+}
+.brand-experiment .brand-halo {
+  background: radial-gradient(ellipse, var(--c-accent-soft), transparent 65%);
+}
+.brand-experiment .brand-ribbon i {
+  border-color: var(--c-accent) var(--studio-companion) var(--c-accent-dim);
+  box-shadow:
+    inset 5px 5px 12px var(--c-accent-soft),
+    5px 10px 28px var(--c-accent-glow);
+}
+.brand-experiment .brand-photo span,
+.brand-experiment .motion-object > i > span {
+  background: linear-gradient(
+    145deg,
+    var(--c-accent),
+    var(--studio-companion),
+    var(--c-accent-dim)
+  );
+}
+.brand-experiment .brand-entry-card,
+.brand-experiment .studio-card,
+.brand-experiment .room-chat,
+.brand-experiment .group-mode-control {
+  background:
+    linear-gradient(140deg, var(--c-accent-soft), transparent 60%),
+    var(--c-surface-1) !important;
+  border-color: var(--c-border) !important;
+}
+.brand-experiment .action-primary,
+.brand-experiment .btn-primary,
+.brand-experiment #create-room-btn:not(:disabled),
+.brand-experiment #join-room-btn:not(:disabled) {
+  background: linear-gradient(
+    115deg,
+    var(--studio-button),
+    var(--c-accent-dim)
+  ) !important;
+  color: #fff;
+  border-color: var(--c-accent-border);
+  box-shadow:
+    0 6px 24px var(--c-accent-glow),
+    inset 0 1px #ffffff24;
+}
+.brand-experiment .action-secondary {
+  background: var(--c-surface-2);
+  border-color: var(--c-border);
+}
+.brand-experiment input,
+.brand-experiment select,
+.brand-experiment textarea {
+  background-color: var(--c-surface-2) !important;
+  border-color: var(--c-border) !important;
+}
+.brand-experiment input:focus,
+.brand-experiment select:focus,
+.brand-experiment textarea:focus {
+  outline-color: var(--c-accent) !important;
+}
+.brand-experiment .studio-eyebrow {
+  color: var(--c-accent);
+}
+.brand-experiment .studio-room-tag,
+.brand-experiment .studio-pill {
+  background: var(--c-surface-2);
+  border-color: var(--c-border);
+}
+.brand-experiment .brand-hero h1,
+.brand-experiment .studio-heading h1,
+.brand-experiment .style-picker-heading h2 {
+  font-family: var(--studio-display) !important;
+}
+.brand-experiment .brand-hero h1 span {
+  background-image: linear-gradient(
+    100deg,
+    var(--c-accent),
+    var(--studio-companion)
+  );
+}
+.brand-experiment .chat-bubble.is-mine {
+  background: var(--c-surface-3);
+  border-color: var(--c-accent-border);
+}
+.brand-experiment .shot-choice.is-used {
+  border-color: var(--c-accent);
+}
+.brand-experiment [id^="theme-card-"][aria-pressed="true"],
+.brand-experiment [id^="layout-card-"][aria-pressed="true"] {
+  box-shadow:
+    0 0 0 1px var(--c-accent),
+    0 12px 40px var(--c-accent-glow) !important;
+}
+.brand-experiment .capture-steps .is-active b {
+  box-shadow:
+    0 0 0 1px var(--c-accent),
+    0 0 14px var(--c-accent-glow);
+}
+.brand-experiment .style-selected-check {
+  background: var(--studio-button);
+}
+.brand-experiment .style-filmstrip {
+  border-color: var(--c-border);
+}
+.brand-experiment .style-filmstrip::before,
+.brand-experiment .style-filmstrip::after {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--c-border) 0 12px,
+    transparent 12px 24px
+  );
+}
+.brand-experiment .style-reel-track {
+  scrollbar-color: var(--c-accent-dim) transparent;
+}
+.style-reel-controls .style-playback {
+  width: auto;
+  padding: 0 11px;
+  border-radius: 12px;
+  font: 600 11px var(--font-ui);
+  gap: 5px;
+  display: flex;
+}
+.brand-experiment .photo-style-card:hover { border-color:var(--c-accent); }
+.brand-experiment .photo-style-card:hover .style-print { animation-play-state:paused; }
+@media (max-width: 600px) {
+  .style-picker-heading {
+    align-items: flex-start;
+  }
+  .style-reel-controls {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 145px;
+    gap: 6px;
+  }
+  .style-reel-controls button {
+    width: 36px;
+    min-height: 36px;
+  }
+}
