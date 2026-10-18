@@ -47,6 +47,10 @@ export default function DecorateRoom() {
 
   const handleNext = () => {
     if (isHost && roomCode && selfId) {
+      if (useRoomStore.getState().status === "exporting") {
+        publishStage("export", () => navigate("/export"));
+        return;
+      }
       socket.emit(
         "update-room-state",
         {
