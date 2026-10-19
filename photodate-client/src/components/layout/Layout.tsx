@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { THEMES, DEFAULT_THEME } from "../../data/themes";
 import { DESIGN_PACKS } from "../../data/themePacks";
 import { getPhotoStyle } from "../../data/photoStyles";
+import { editorPayload } from "../../lib/editorPayload";
 
 interface LayoutProps {
   children: ReactNode;
@@ -55,6 +56,9 @@ export default function Layout({ children }: LayoutProps) {
     setConnectionError("");
     let applying = false;
     let debounce: ReturnType<typeof setTimeout> | undefined;
+    let editorInFlight = false;
+    let editorQueued = false;
+    let editorGeneration = 0;
     const route = (status: string, stage = "editor") => {
       const path =
         status === "waiting"
@@ -77,6 +81,7 @@ export default function Layout({ children }: LayoutProps) {
     const apply = (snapshot: RoomSnapshot, restoreEditor = false) => {
       if (!isCurrent() || snapshot.room.id !== useRoomStore.getState().roomId)
         return;
+      setConnectionError("");
       if (snapshot.room.status === "closed") {
         setConnectionError("");
         route("closed");
@@ -148,7 +153,7 @@ export default function Layout({ children }: LayoutProps) {
       });
       const hasPendingEdit =
         previous.isHost &&
-        !restoreEditor &&
+        (!restoreEditor || editorQueued || editorInFlight) &&
         previous.roundId === snapshot.roundId &&
         ["reviewing", "editing", "exporting"].includes(snapshot.room.status);
       if (previous.stage !== snapshot.stage) {
@@ -213,6 +218,13 @@ export default function Layout({ children }: LayoutProps) {
             apply(ack.snapshot, true);
             route(ack.snapshot.room.status, ack.snapshot.stage);
           }
+          if (
+            editorQueued &&
+            ["reviewing", "editing", "exporting"].includes(
+              useRoomStore.getState().status,
+            )
+          )
+            sendEditor();
           if (useRoomStore.getState().cameraReady)
             socket.emit(
               "capture-ready",
@@ -225,6 +237,9 @@ export default function Layout({ children }: LayoutProps) {
       );
     };
     const disconnected = () => {
+      if (editorInFlight) editorQueued = true;
+      editorInFlight = false;
+      editorGeneration++;
       if (isCurrent())
         useRoomStore.setState({ connectionStatus: "disconnected" });
     };
@@ -238,39 +253,46 @@ export default function Layout({ children }: LayoutProps) {
       connectionFailed(
         new Error("Reconnection stopped. Retry the connection or return home."),
       );
-    const unsubscribe = useSessionStore.subscribe((state) => {
+    const sendEditor = () => {
       if (
-        applying ||
-        !useRoomStore.getState().isHost ||
-        !["reviewing", "editing", "exporting"].includes(
-          useRoomStore.getState().status,
-        )
-      )
+        !isCurrent() ||
+        !socket.connected ||
+        useRoomStore.getState().connectionStatus !== "joined"
+      ) {
+        editorQueued = true;
         return;
-      clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        debounce = undefined;
-        const {
-          customLayout,
-          assignedPhotos,
-          placedStickers,
-          drawStrokes,
-          stripTitle,
-          photoEdits,
-          photoSources,
-          textLayers,
-          titleStyle,
-          titlePosition,
-          filterId,
-          showWatermark,
-          designPreset,
-          layoutId,
-        } = state;
-        socket.emit(
-          "update-editor",
-          {
-            code: roomCode,
-            editor: {
+      }
+      if (editorInFlight) {
+        editorQueued = true;
+        return;
+      }
+      editorInFlight = true;
+      const generation = ++editorGeneration;
+      editorQueued = false;
+      const state = useSessionStore.getState();
+      const {
+        customLayout,
+        assignedPhotos,
+        placedStickers,
+        drawStrokes,
+        stripTitle,
+        photoEdits,
+        photoSources,
+        textLayers,
+        titleStyle,
+        titlePosition,
+        filterId,
+        showWatermark,
+        designPreset,
+        layoutId,
+      } = state;
+      socket.emit(
+        "update-editor",
+        {
+          code: roomCode,
+          patch: true,
+          editor: editorPayload(
+            {
               customLayout,
               assignedPhotos,
               placedStickers,
@@ -286,16 +308,39 @@ export default function Layout({ children }: LayoutProps) {
               designPreset,
               layoutId,
             },
-            stage:
-              useRoomStore.getState().stage === "review"
-                ? "editor"
-                : useRoomStore.getState().stage,
-          },
-          (ack) => {
-            if (!ack.ok) setConnectionError(ack.error.message);
-          },
-        );
-      }, 250);
+            useRoomStore.getState().reviewPhotos,
+          ),
+          stage:
+            useRoomStore.getState().stage === "review"
+              ? "editor"
+              : useRoomStore.getState().stage,
+        },
+        (ack) => {
+          if (generation !== editorGeneration) return;
+          editorInFlight = false;
+          if (!isCurrent()) return;
+          if (!ack.ok) {
+            editorQueued = true;
+            setConnectionError(ack.error.message);
+          } else setConnectionError("");
+          if (editorQueued && ack.ok) {
+            clearTimeout(debounce);
+            debounce = setTimeout(sendEditor, 250);
+          }
+        },
+      );
+    };
+    const unsubscribe = useSessionStore.subscribe(() => {
+      if (
+        applying ||
+        !useRoomStore.getState().isHost ||
+        !["reviewing", "editing", "exporting"].includes(
+          useRoomStore.getState().status,
+        )
+      )
+        return;
+      clearTimeout(debounce);
+      debounce = setTimeout(sendEditor, 250);
     });
     const collaboration = (
       value: import("../../../../shared/contracts").CollaborationState,

@@ -2,6 +2,7 @@ import { leaveRoom } from "./api";
 import { socket } from "./socket";
 import { useRoomStore } from "../state/useRoomStore";
 import { useSessionStore } from "../state/useSessionStore";
+import { editorPayload } from "./editorPayload";
 export function leaveSession(skipRemote = false) {
   const { roomCode, selfId } = useRoomStore.getState();
   if (!skipRemote && roomCode && selfId)
@@ -36,22 +37,26 @@ export function publishStage(stage: string, onSuccess?: () => void) {
     {
       code: room.roomCode,
       stage,
-      editor: {
-        customLayout,
-        assignedPhotos,
-        placedStickers,
-        drawStrokes,
-        stripTitle,
-        photoEdits,
-        photoSources,
-        textLayers,
-        titleStyle,
-        titlePosition,
-        filterId,
-        showWatermark,
-        designPreset,
-        layoutId,
-      },
+      patch: true,
+      editor: editorPayload(
+        {
+          customLayout,
+          assignedPhotos,
+          placedStickers,
+          drawStrokes,
+          stripTitle,
+          photoEdits,
+          photoSources,
+          textLayers,
+          titleStyle,
+          titlePosition,
+          filterId,
+          showWatermark,
+          designPreset,
+          layoutId,
+        },
+        room.reviewPhotos,
+      ),
     },
     (ack) => {
       if (!ack.ok) window.alert(ack.error.message);
