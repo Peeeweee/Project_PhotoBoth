@@ -157,7 +157,7 @@ export interface ClientToServerEvents<
     ack: Ack<Editor>,
   ) => void;
   "update-editor": (
-    payload: Member & { editor: Editor; stage?: string },
+    payload: Member & { editor: Editor; stage?: string; patch?: boolean },
     ack: Ack<Editor>,
   ) => void;
   "simulate-group": (

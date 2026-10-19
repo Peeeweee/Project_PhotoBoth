@@ -610,7 +610,13 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       "Editor not available",
       409,
     );
-    const editor = editorDocument(p.editor);
+    assert(
+      p.patch === undefined || typeof p.patch === "boolean",
+      "Invalid editor patch flag",
+    );
+    const d = document(room.id);
+    const incoming = editorDocument(p.editor);
+    const editor = p.patch ? { ...d.editor, ...incoming } : incoming;
     assert(
       JSON.stringify(editor).length <= 6000000,
       "Editor document too large",
@@ -621,7 +627,6 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
       ["editor", "filter", "decorate", "export", "done"].includes(stage),
       "Invalid stage",
     );
-    const d = document(room.id);
     const orderChanged =
       JSON.stringify(d.editor.assignedPhotos ?? []) !==
         JSON.stringify(editor.assignedPhotos ?? []) ||

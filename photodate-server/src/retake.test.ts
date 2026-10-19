@@ -122,6 +122,42 @@ test("single-shot retakes keep every other capture and edit, require crew approv
       textLayers: [],
     };
     assert.equal(
+      (await ack(hs, "update-editor", { code, editor, stage: "editor" })).ok,
+      true,
+    );
+    const revisionBeforeFilter = document(host.roomId).reviewRevision;
+    assert.equal(
+      (
+        await ack(hs, "update-editor", {
+          code,
+          editor: { filterId: "mono" },
+          patch: true,
+          stage: "editor",
+        })
+      ).ok,
+      true,
+    );
+    assert.deepEqual(
+      document(host.roomId).editor.assignedPhotos,
+      editor.assignedPhotos,
+    );
+    assert.deepEqual(
+      document(host.roomId).editor.photoEdits,
+      editor.photoEdits,
+    );
+    assert.equal(document(host.roomId).editor.stripTitle, editor.stripTitle);
+    assert.equal(document(host.roomId).reviewRevision, revisionBeforeFilter);
+    assert.equal(
+      (
+        await ack(hs, "update-editor", {
+          code,
+          editor: { filterId: "original" },
+          patch: "true",
+        })
+      ).ok,
+      false,
+    );
+    assert.equal(
       (
         await ack(gs, "prepare-retake", {
           code,
