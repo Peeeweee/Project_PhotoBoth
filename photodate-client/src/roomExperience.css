@@ -931,10 +931,10 @@
   letter-spacing: 0;
 }
 .capture-studio.is-shooting .capture-strip-preview {
-  flex: 1;
+  flex: 0 0 auto;
   width: calc(100% - 32px);
-  height: auto;
-  min-height: 150px;
+  height: clamp(240px, 48svh, 480px);
+  min-height: 0;
   max-height: none;
   margin: 12px 16px;
   aspect-ratio: auto !important;
@@ -1171,7 +1171,7 @@
     display: none;
   }
   .capture-studio.is-shooting .capture-strip-preview {
-    min-height: 100px;
+    height: clamp(180px, 36svh, 320px);
     width: calc(100% - 14px);
     margin: 8px 7px;
   }
