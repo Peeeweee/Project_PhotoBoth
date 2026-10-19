@@ -16,6 +16,193 @@ function source(file) {
   ).outputText;
 }
 
+test("socket acknowledgement timers allow photo uploads and preserve explicit error-first timeouts", () => {
+  const timers = [],
+    sent = [],
+    exports = {};
+  const raw = {
+    flags: {},
+    emit: (...args) => {
+      sent.push(args);
+      return raw;
+    },
+  };
+  vm.runInNewContext(
+    source("../src/lib/socket.ts").replaceAll("import.meta.env", "env"),
+    {
+      exports,
+      env: { DEV: false },
+      window: {
+        location: { origin: "https://example.test" },
+        setTimeout: (fn, delay) => {
+          timers.push({ fn, delay });
+          return timers.length;
+        },
+        clearTimeout() {},
+      },
+      require: () => ({ io: () => raw }),
+    },
+  );
+  const replies = [];
+  exports.socket.emit("update-editor", {}, (response) =>
+    replies.push(response),
+  );
+  assert.equal(timers[0].delay, 30000);
+  sent[0].at(-1)({ ok: true });
+  timers[0].fn();
+  assert.equal(replies.length, 1);
+  raw.flags.timeout = 8000;
+  const callback = () => {};
+  exports.socket.emit("update-room-state", {}, callback);
+  assert.equal(sent[1].at(-1), callback);
+  assert.equal(timers.length, 1);
+});
+
+test("editor synchronization coalesces rapid filters, clears recovered errors and ignores old connection callbacks", () => {
+  const exports = {},
+    effects = [],
+    sent = [],
+    handlers = {},
+    timers = new Map(),
+    errors = [];
+  let timerId = 0,
+    subscribe;
+  const room = {
+    roomId: "room",
+    roomCode: "ABCDE",
+    selfId: "host",
+    isHost: true,
+    status: "editing",
+    stage: "filter",
+    connectionStatus: "joined",
+    roundId: "round",
+    reviewPhotos: ["photo"],
+    messages: [],
+  };
+  const state = {
+    assignedPhotos: ["photo"],
+    filterId: "original",
+    layoutId: "4x1",
+    themePack: null,
+  };
+  const roomStore = Object.assign(
+    (selector) => (selector ? selector(room) : room),
+    { getState: () => room, setState: (patch) => Object.assign(room, patch) },
+  );
+  const sessionStore = Object.assign(
+    (selector) => (selector ? selector(state) : state),
+    {
+      getState: () => state,
+      setState: (patch) => Object.assign(state, patch),
+      subscribe: (fn) => {
+        subscribe = fn;
+        return () => {};
+      },
+    },
+  );
+  const socket = {
+    connected: true,
+    emit: (...args) => sent.push(args),
+    on: (event, fn) => {
+      handlers[event] = fn;
+    },
+    off() {},
+    io: { on() {}, off() {} },
+  };
+  let hook = 0;
+  const jsx = (type, props) => ({ type, props });
+  const payloadExports = {};
+  vm.runInNewContext(source("../src/lib/editorPayload.ts"), {
+    exports: payloadExports,
+  });
+  vm.runInNewContext(source("../src/components/layout/Layout.tsx"), {
+    exports,
+    navigator: { onLine: true },
+    window: { addEventListener() {}, removeEventListener() {} },
+    document: { addEventListener() {}, removeEventListener() {} },
+    setTimeout: (fn) => {
+      timers.set(++timerId, fn);
+      return timerId;
+    },
+    clearTimeout: (id) => timers.delete(id),
+    require: (name) =>
+      name === "react"
+        ? {
+            useRef: (value) => ({ current: value }),
+            useEffect: (fn) => effects.push(fn),
+            useState: (value) => {
+              const i = hook++;
+              return [
+                value,
+                (next) => {
+                    if (i === 3) errors.push(next);
+                },
+              ];
+            },
+          }
+        : name === "react/jsx-runtime"
+          ? { jsx, jsxs: jsx }
+          : name === "react-router-dom"
+            ? { useNavigate: () => () => {} }
+            : name.includes("useRoomStore")
+              ? { useRoomStore: roomStore }
+              : name.includes("useSessionStore")
+                ? { useSessionStore: sessionStore }
+                : name.includes("lib/socket")
+                  ? { socket }
+                  : name.includes("editorPayload")
+                    ? payloadExports
+                    : name.includes("data/themes")
+                      ? { DEFAULT_THEME: {}, THEMES: [] }
+                      : name.includes("themePacks")
+                        ? { DESIGN_PACKS: [] }
+                        : name.includes("photoStyles")
+                          ? { getPhotoStyle: () => ({ filterId: "original" }) }
+                          : {},
+  });
+  exports.default({ children: null });
+  const cleanup = effects[0]();
+  sent[0].at(-1)({ ok: true }); // Join acknowledgement.
+  const flush = () => {
+    const work = [...timers.values()];
+    timers.clear();
+    work.forEach((fn) => fn());
+  };
+  const change = (filter) => {
+    state.filterId = filter;
+    subscribe();
+    flush();
+  };
+  change("mono");
+  change("retro");
+  change("cool");
+  let edits = sent.filter(([event]) => event === "update-editor");
+  assert.equal(edits.length, 1);
+  assert.equal(edits[0][1].editor.assignedPhotos, undefined);
+  edits[0].at(-1)({ ok: true });
+  flush();
+  edits = sent.filter(([event]) => event === "update-editor");
+  assert.equal(edits.length, 2);
+  assert.equal(edits[1][1].editor.filterId, "cool");
+  edits[1].at(-1)({ ok: false, error: { message: "Temporary timeout" } });
+  assert.equal(errors.at(-1), "Temporary timeout");
+  change("film");
+  edits = sent.filter(([event]) => event === "update-editor");
+  handlers.disconnect();
+  handlers.connect();
+  sent.at(-1).at(-1)({ ok: true });
+  const latest = sent.at(-1);
+  assert.equal(latest[0], "update-editor");
+  latest.at(-1)({ ok: true });
+  assert.equal(errors.at(-1), "");
+  edits.at(-1).at(-1)({
+    ok: false,
+    error: { message: "Old connection timed out" },
+  });
+  assert.equal(errors.at(-1), "");
+  cleanup();
+});
+
 test("shooting mode retains the camera position and framing while hiding camera switching", () => {
   const CameraView = () => null;
   const jsx = (type, props) => ({ type, props });

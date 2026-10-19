@@ -41,6 +41,22 @@ const {
 const { default: db } = require("../../photodate-server/dist/db.js");
 after(() => db.close());
 
+test("filter settings omit acknowledged photos and include replacement images", () => {
+  const { editorPayload } = catalog("../src/lib/editorPayload.ts");
+  const photo = "data:image/jpeg;base64," + "a".repeat(250000);
+  const state = {
+    assignedPhotos: [photo, photo],
+    filterId: "mono",
+    stripTitle: "Our date",
+  };
+  const patch = editorPayload(state, [photo, photo]);
+  assert.equal(patch.assignedPhotos, undefined);
+  assert.equal(patch.filterId, "mono");
+  assert.ok(JSON.stringify(patch).length < 100);
+  assert.equal(editorPayload(state, []).assignedPhotos, state.assignedPhotos);
+  assert.equal(state.assignedPhotos.length, 2);
+});
+
 test("occasion templates reference available layouts, designs and filters", () => {
   const textStyles = catalog("../src/data/textStyles.ts");
   const { KEEPSAKE_TEMPLATES } = catalog("../src/data/keepsakeTemplates.ts", {
