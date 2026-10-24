@@ -293,6 +293,8 @@ export default function CameraView({
           captureRatio >= 1 ? Math.round(1280 / captureRatio) : 1280;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
         const ratio = canvas.width / canvas.height;
         const sourceWidth = Math.min(
           video.videoWidth,
@@ -317,7 +319,7 @@ export default function CameraView({
         if (consumed.current.has(shotKey)) return;
         consumed.current.add(shotKey);
         callbacks.current.onCapture(
-          canvas.toDataURL("image/jpeg", 0.85),
+          canvas.toDataURL("image/jpeg", 0.92),
           frameIndex,
           roundId,
         );
