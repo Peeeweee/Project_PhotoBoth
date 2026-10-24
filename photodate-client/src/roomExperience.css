@@ -1,4 +1,5 @@
 .leave-dialog {
+  position: relative;
   margin: auto;
   width: min(460px, calc(100vw - 32px));
   max-height: 90dvh;
@@ -9,6 +10,76 @@
   background: var(--c-surface-1);
   color: var(--c-text-hi);
   box-shadow: 0 30px 100px #0009;
+}
+.room-status-card {
+  width: min(620px, calc(100% - 32px));
+  margin: 48px auto;
+  padding: clamp(24px, 5vw, 44px);
+  background: var(--c-surface-1);
+  border: 1px solid var(--c-border);
+  border-radius: 28px;
+  box-shadow: 0 20px 70px #0002;
+  text-align: center;
+}
+.room-status-card .restart-card-icon {
+  margin: 0 auto 22px;
+}
+.room-status-card h1 {
+  font-size: clamp(26px, 4vw, 38px);
+  line-height: 1.15;
+  margin: 16px 0;
+}
+.room-status-card p {
+  color: var(--c-text-md);
+  line-height: 1.8;
+}
+.room-status-card .leave-actions {
+  justify-content: center;
+  margin-bottom: 22px;
+}
+.room-status-card small {
+  color: var(--c-text-md);
+  line-height: 1.6;
+  display: block;
+}
+.room-status-code {
+  display: inline-block;
+  padding: 8px 14px;
+  background: var(--c-surface-2);
+  border-radius: 10px;
+  font: 12px var(--font-mono);
+  letter-spacing: 2px;
+}
+.room-left-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--c-accent-border);
+  background: var(--c-surface-1);
+  border-radius: 20px;
+  padding: 20px;
+}
+.room-left-card > div {
+  flex: 1;
+}
+.room-left-card p {
+  color: var(--c-text-md);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 8px 0 0;
+}
+.room-left-card button {
+  flex-shrink: 0;
+  padding: 10px;
+  border-radius: 10px;
+}
+@media (max-width: 540px) {
+  .room-left-card {
+    flex-wrap: wrap;
+  }
+  .room-left-card > div {
+    flex-basis: 100%;
+  }
 }
 .leave-dialog::backdrop {
   background: #080612ba;

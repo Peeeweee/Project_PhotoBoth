@@ -8,6 +8,8 @@ import { waitForExport } from "../lib/exportReady";
 import { StripCanvas, DraggableSticker, DrawOverlay } from "./editor";
 import { STICKERS } from "../data/stickerPresets";
 import { FILTER_PRESETS } from "../data/filterPresets";
+import { useRoomStore } from "../state/useRoomStore";
+import { ROOM_END_COPY } from "../lib/roomAvailability";
 export default function RoomClosed() {
   const state = useSessionStore();
   const navigate = useNavigate();
@@ -16,15 +18,17 @@ export default function RoomClosed() {
   const [error, setError] = useState("");
   const [savedUrl, setSavedUrl] = useState("");
   const hasPhotos = state.assignedPhotos.some(Boolean);
+  const reason = useRoomStore((s) => s.roomEndReason) ?? "closed";
+  const copy = ROOM_END_COPY[reason];
   return (
     <section className="closed-session studio-page">
       <div className="closed-session-icon">
         <Heart size={28} />
       </div>
-      <span className="studio-eyebrow">UNTIL THE NEXT PHOTO DATE</span>
-      <h1>This room has wrapped up.</h1>
+      <span className="studio-eyebrow">{copy.eyebrow}</span>
+      <h1>{copy.title}</h1>
       <p>
-        The host ended the session.
+        {copy.description}{" "}
         {hasPhotos
           ? " Your latest strip is still here. Save a copy before leaving this tab."
           : " Thanks for being part of the moment. Start a fresh room whenever you’re ready."}
@@ -108,11 +112,11 @@ export default function RoomClosed() {
         <button
           className="action-secondary"
           onClick={() => {
-            leaveSession();
-            navigate("/");
+            leaveSession(true);
+            navigate("/?create=1");
           }}
         >
-          Back to PhotoDate <ArrowRight size={17} />
+          Create a new lobby <ArrowRight size={17} />
         </button>
       </div>
       {savedUrl && (

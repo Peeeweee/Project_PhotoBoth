@@ -3,7 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, ArrowRight, Hash, Users, Camera } from "lucide-react";
-import { createRoom, joinRoom } from "../lib/api";
+import { createRoom, joinRoom, HttpError } from "../lib/api";
+import {
+  roomEndReason,
+  ROOM_END_COPY,
+  type RoomEndReason,
+} from "../lib/roomAvailability";
 import { isRoomCode, normalizeRoomCode } from "../lib/roomCode";
 import { useRoomStore } from "../state/useRoomStore";
 import { useSessionStore } from "../state/useSessionStore";
@@ -245,6 +250,26 @@ export default function Landing() {
   const [loadingJoin, setLoadingJoin] = useState(false);
   const [errorCreate, setErrorCreate] = useState<string | null>(null);
   const [fullRoom, setFullRoom] = useState(false);
+  const [unavailable, setUnavailable] = useState<RoomEndReason | null>(null);
+  const [dismissedLeave, setDismissedLeave] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("create"))
+      document.getElementById("host-name-input")?.focus();
+  }, []);
+  const prepareNewLobby = () => {
+    setHostName(guestName || hostName);
+    setUnavailable(null);
+    setFullRoom(false);
+    setErrorJoin(null);
+    setJoinCode("");
+    navigate("/?create=1", { replace: true });
+    requestAnimationFrame(() => {
+      document
+        .getElementById("host-name-input")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById("host-name-input")?.focus();
+    });
+  };
   const [errorJoin, setErrorJoin] = useState<string | null>(null);
 
   // Auto-select Classic if nothing chosen
@@ -334,9 +359,13 @@ export default function Landing() {
       navigate("/lobby");
     } catch (e) {
       const msg = (e as Error).message;
-      if (msg.includes("not found") || msg.includes("404")) {
+      const ended = roomEndReason(
+        e instanceof HttpError ? e.status : undefined,
+        msg,
+      );
+      if (ended) {
+        setUnavailable(ended);
         setFullRoom(false);
-        setErrorJoin("Room not found. Please double-check the code.");
       } else if (msg.includes("full")) {
         setFullRoom(true);
       } else {
@@ -349,6 +378,43 @@ export default function Landing() {
     }
   };
 
+  if (unavailable) {
+    const copy = ROOM_END_COPY[unavailable];
+    return (
+      <section
+        className="room-status-card studio-page"
+        aria-labelledby="room-unavailable-title"
+      >
+        <div className="restart-card-icon">
+          <Camera size={28} />
+        </div>
+        <span className="studio-eyebrow">{copy.eyebrow}</span>
+        <h1 id="room-unavailable-title">{copy.title}</h1>
+        <span className="room-status-code">ROOM {joinCode}</span>
+        <p>{copy.description}</p>
+        <div className="leave-actions">
+          <button className="action-primary" onClick={prepareNewLobby}>
+            Create a new lobby <ArrowRight size={16} />
+          </button>
+          <button
+            onClick={() => {
+              setUnavailable(null);
+              setErrorJoin(null);
+              requestAnimationFrame(() =>
+                document.getElementById("join-code-input")?.focus(),
+              );
+            }}
+          >
+            Try a different code
+          </button>
+        </div>
+        <small>
+          A new lobby gets a new invitation. Share it with everyone you want to
+          join.
+        </small>
+      </section>
+    );
+  }
   if (fullRoom)
     return (
       <section className="full-room studio-page">
@@ -414,6 +480,31 @@ export default function Landing() {
           gap: "var(--sp-8)",
         }}
       >
+        {params.has("left") && !dismissedLeave && (
+          <aside className="room-left-card" role="status">
+            <div>
+              <strong>
+                {params.get("left") === "host"
+                  ? "Your room is now closed."
+                  : "You’ve left the room."}
+              </strong>
+              <p>
+                {params.get("left") === "local"
+                  ? "Your device has disconnected. The server could not confirm your departure; it will handle your spot using its reconnect policy."
+                  : "Ready for another photo date? Create a new lobby and invite your crew."}
+              </p>
+            </div>
+            <button className="action-primary" onClick={prepareNewLobby}>
+              New lobby
+            </button>
+            <button
+              aria-label="Dismiss departure confirmation"
+              onClick={() => setDismissedLeave(true)}
+            >
+              ×
+            </button>
+          </aside>
+        )}
         {/* ── Hero ──────────────────────────────────────────── */}
         <motion.div
           variants={fadeUp}
