@@ -41,6 +41,26 @@ const {
 const { default: db } = require("../../photodate-server/dist/db.js");
 after(() => db.close());
 
+test("room availability distinguishes permanent invitations from recoverable network failures", () => {
+  const { roomEndReason, ROOM_END_COPY } = catalog(
+    "../src/lib/roomAvailability.ts",
+  );
+  assert.equal(roomEndReason(410, "Room expired"), "expired");
+  assert.equal(roomEndReason("HTTP_410", "Room closed"), "closed");
+  assert.equal(roomEndReason(404, "Room not found"), "unavailable");
+  assert.equal(
+    roomEndReason("HTTP_401", "Session credential revoked"),
+    "membership",
+  );
+  assert.equal(roomEndReason(503, "Server unavailable"), null);
+  assert.equal(
+    roomEndReason("ACK_TIMEOUT", "The server did not respond"),
+    null,
+  );
+  assert.ok(ROOM_END_COPY.unavailable.description.includes("may"));
+  assert.ok(ROOM_END_COPY.expired.description.includes("new lobby"));
+});
+
 test("filter settings omit acknowledged photos and include replacement images", () => {
   const { editorPayload } = catalog("../src/lib/editorPayload.ts");
   const photo = "data:image/jpeg;base64," + "a".repeat(250000);
@@ -96,7 +116,7 @@ test("photo adjustments preserve the source and clamp dragging inside supported 
   const clamped = panPhoto(initial, 9999, -9999, 0, 0);
   assert.equal(clamped.x, -50);
   assert.equal(clamped.y, 50);
-  assert.equal(photoPresentation().objectFit, "contain");
+  assert.equal(photoPresentation().objectFit, "cover");
   assert.throws(() =>
     editorDocument({ photoEdits: [{ fit: "cover", zoom: 4, x: 0, y: 0 }] }),
   );

@@ -135,7 +135,7 @@ test("editor synchronization coalesces rapid filters, clears recovered errors an
               return [
                 value,
                 (next) => {
-                    if (i === 3) errors.push(next);
+                  if (i === 3) errors.push(next);
                 },
               ];
             },
@@ -200,6 +200,22 @@ test("editor synchronization coalesces rapid filters, clears recovered errors an
     error: { message: "Old connection timed out" },
   });
   assert.equal(errors.at(-1), "");
+  room.isHost = false;
+  handlers["editor-state-changed"]({
+    roomId: "room",
+    editor: { filterId: "peach" },
+    stage: "filter",
+    version: 10,
+  });
+  assert.equal(state.filterId, "peach");
+  assert.equal(state.assignedPhotos[0], "photo");
+  handlers["editor-state-changed"]({
+    roomId: "room",
+    editor: { filterId: "mono" },
+    stage: "filter",
+    version: 9,
+  });
+  assert.equal(state.filterId, "peach");
   cleanup();
 });
 
@@ -258,6 +274,13 @@ test("shooting mode retains the camera position and framing while hiding camera 
           }),
           slotAspectRatio: () => 4 / 3,
         };
+      if (name.includes("photoComposition")) {
+        const geometry = {};
+        vm.runInNewContext(source("../src/lib/photoComposition.ts"), {
+          exports: geometry,
+        });
+        return geometry;
+      }
       if (name === "../components/capture") return { CameraView };
       return {};
     },
@@ -697,7 +720,7 @@ test("external camera selection requests the exact device, releases it, and neve
   assert.equal(missing.requests.length, 1);
   assert.equal(missing.errors[0], "External camera unavailable");
 });
-test("group composition fits the selected frame without cropping any participant image", async () => {
+test("group composition fills the selected frame without black bars", async () => {
   const draws = [],
     exports = {};
   const canvas = {
@@ -716,6 +739,10 @@ test("group composition fits the selected frame without cropping any participant
       this.onload();
     }
   }
+  const geometry = {};
+  vm.runInNewContext(source("../src/lib/photoComposition.ts"), {
+    exports: geometry,
+  });
   vm.runInNewContext(source("../src/lib/composeCaptures.ts"), {
     exports,
     Image,
@@ -724,23 +751,25 @@ test("group composition fits the selected frame without cropping any participant
     Promise,
     document: { createElement: () => canvas },
     require: (name) =>
-      name.includes("stripLayouts")
-        ? {
-            getLayout: () => ({ frameAspectRatio: 1 }),
-            slotAspectRatio: () => 1,
-          }
-        : name.includes("useSessionStore")
-          ? { useSessionStore: { getState: () => ({ layoutId: "collage" }) } }
-          : {
-              useRoomStore: {
-                getState: () => ({
-                  participants: [
-                    { id: "a", slot_index: 0 },
-                    { id: "b", slot_index: 1 },
-                  ],
-                }),
+      name.includes("photoComposition")
+        ? geometry
+        : name.includes("stripLayouts")
+          ? {
+              getLayout: () => ({ frameAspectRatio: 1 }),
+              slotAspectRatio: () => 1,
+            }
+          : name.includes("useSessionStore")
+            ? { useSessionStore: { getState: () => ({ layoutId: "collage" }) } }
+            : {
+                useRoomStore: {
+                  getState: () => ({
+                    participants: [
+                      { id: "a", slot_index: 0 },
+                      { id: "b", slot_index: 1 },
+                    ],
+                  }),
+                },
               },
-            },
   });
   await exports.composeCaptures([
     { id: "a", participant_id: "a", frame_index: 0, image_url: "one" },
@@ -749,10 +778,48 @@ test("group composition fits the selected frame without cropping any participant
   assert.equal(canvas.width, canvas.height);
   assert.equal(draws.length, 2);
   for (const args of draws) {
-    assert.equal(args.length, 5);
-    assert.equal(args[3], 600);
-    assert.equal(args[4], 1200);
+    assert.equal(args.length, 9);
+    assert.equal(args[7], 600);
+    assert.equal(args[8], 1200);
   }
+});
+
+test("portrait, landscape and mixed participant tiles cover every frame with bounded crops", () => {
+  const geometry = {};
+  vm.runInNewContext(source("../src/lib/photoComposition.ts"), {
+    exports: geometry,
+  });
+  for (const aspect of [0.5, 0.75, 1, 1.5, 2])
+    for (let count = 1; count <= 4; count++) {
+      const sources = [16 / 9, 3 / 4, 1, 4 / 3].slice(0, count);
+      const tiles = geometry.participantTiles(count, aspect, sources);
+      assert.equal(tiles.length, count);
+      assert.ok(
+        Math.abs(
+          tiles.reduce((sum, cell) => sum + cell.width * cell.height, 0) - 1,
+        ) < 1e-9,
+      );
+      tiles.forEach((cell, i) => {
+        const width = 1200 * sources[i],
+          height = 1200;
+        const crop = geometry.coverCrop(
+          width,
+          height,
+          (aspect * cell.width) / cell.height,
+        );
+        assert.ok(crop.x >= -1e-8 && crop.y >= -1e-8);
+        assert.ok(crop.x + crop.width <= width + 1e-8);
+        assert.ok(crop.y + crop.height <= height + 1e-8);
+        assert.ok(
+          Math.abs(
+            crop.width / crop.height - (aspect * cell.width) / cell.height,
+          ) < 1e-8,
+        );
+      });
+    }
+  const portrait = geometry.participantTiles(2, 0.75, [16 / 9, 16 / 9]);
+  assert.equal(portrait[0].width, 1);
+  assert.equal(portrait[0].height, 0.5);
 });
 test("crew photo order respects suggested positions and keeps every chosen photo unique", () => {
   const exports = {};

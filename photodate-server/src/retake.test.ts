@@ -4,7 +4,8 @@ import { once } from "node:events";
 import { io as connect, type Socket } from "socket.io-client";
 process.env.DB_PATH = ":memory:";
 const { httpServer, io } = require("./index") as typeof import("./index");
-const { document, save } = require("./runtime") as typeof import("./runtime");
+const { document, save, cleanup } =
+  require("./runtime") as typeof import("./runtime");
 const { default: db } = require("./db") as typeof import("./db");
 const png =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
@@ -128,6 +129,29 @@ test("single-shot retakes keep every other capture and edit, require crew approv
     const revisionBeforeFilter = document(host.roomId).reviewRevision;
     assert.equal(
       (
+        await ack(hs, "review-approval", {
+          code,
+          revision: revisionBeforeFilter,
+          approved: true,
+        })
+      ).ok,
+      true,
+    );
+    assert.equal(
+      (
+        await ack(gs, "review-approval", {
+          code,
+          revision: revisionBeforeFilter,
+          approved: true,
+        })
+      ).ok,
+      true,
+    );
+    const compactUpdate = new Promise<any>((resolve) =>
+      gs.once("editor-state-changed", resolve),
+    );
+    assert.equal(
+      (
         await ack(hs, "update-editor", {
           code,
           editor: { filterId: "mono" },
@@ -147,6 +171,11 @@ test("single-shot retakes keep every other capture and edit, require crew approv
     );
     assert.equal(document(host.roomId).editor.stripTitle, editor.stripTitle);
     assert.equal(document(host.roomId).reviewRevision, revisionBeforeFilter);
+    const compact = await compactUpdate;
+    assert.equal(compact.editor.filterId, "mono");
+    assert.equal(compact.editor.assignedPhotos, undefined);
+    assert.ok(JSON.stringify(compact).length < 500);
+    assert.equal(document(host.roomId).reviewApprovals.length, 2);
     assert.equal(
       (
         await ack(hs, "update-editor", {
@@ -312,6 +341,27 @@ test("single-shot retakes keep every other capture and edit, require crew approv
       true,
     );
     assert.equal(document(host.roomId).retakeFrameIndex, 0);
+    const expiredNotice = new Promise<any>((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("Expired room notice missing")),
+        2000,
+      );
+      hs.on("room-snapshot", (value) => {
+        if (value.room.id === host.roomId && value.room.status === "closed") {
+          clearTimeout(timeout);
+          resolve(value);
+        }
+      });
+    });
+    db.prepare(
+      "UPDATE rooms SET created_at=datetime('now','-30 hours') WHERE id=?",
+    ).run(host.roomId);
+    cleanup();
+    assert.equal((await expiredNotice).closureReason, "expired");
+    assert.equal(
+      db.prepare("SELECT id FROM rooms WHERE id=?").get(host.roomId),
+      undefined,
+    );
   } finally {
     for (const socket of sockets) socket.disconnect();
     await new Promise<void>((resolve) => io.close(() => resolve()));
