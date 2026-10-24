@@ -14,6 +14,7 @@ import { THEMES, DEFAULT_THEME } from "../../data/themes";
 import { DESIGN_PACKS } from "../../data/themePacks";
 import { getPhotoStyle } from "../../data/photoStyles";
 import { editorPayload } from "../../lib/editorPayload";
+import { roomEndReason } from "../../lib/roomAvailability";
 
 interface LayoutProps {
   children: ReactNode;
@@ -59,6 +60,7 @@ export default function Layout({ children }: LayoutProps) {
     let editorInFlight = false;
     let editorQueued = false;
     let editorGeneration = 0;
+    let latestVersion = -1;
     const route = (status: string, stage = "editor") => {
       const path =
         status === "waiting"
@@ -81,17 +83,25 @@ export default function Layout({ children }: LayoutProps) {
     const apply = (snapshot: RoomSnapshot, restoreEditor = false) => {
       if (!isCurrent() || snapshot.room.id !== useRoomStore.getState().roomId)
         return;
+      if (snapshot.version < latestVersion) return;
+      latestVersion = snapshot.version;
       setConnectionError("");
       if (snapshot.room.status === "closed") {
+        useRoomStore.setState({
+          roomEndReason: snapshot.closureReason ?? "closed",
+        });
         setConnectionError("");
         route("closed");
       } else if (
         !snapshot.participants.some((person) => person.id === selfId)
       ) {
-        useRoomStore.setState({ connectionStatus: "error" });
-        setConnectionError(
-          "Your membership in this room has ended. Return home and enter its code again if the session is still open.",
-        );
+        useRoomStore.setState({
+          connectionStatus: "error",
+          status: "closed",
+          roomEndReason: "membership",
+        });
+        route("closed");
+        return;
       }
       applying = true;
       const previous = useRoomStore.getState();
@@ -202,8 +212,13 @@ export default function Layout({ children }: LayoutProps) {
         (ack) => {
           if (!isCurrent()) return;
           if (!ack.ok) {
-            if (ack.error.code === "HTTP_410") {
-              useRoomStore.setState({ status: "closed" });
+            const ended = roomEndReason(ack.error.code, ack.error.message);
+            if (ended) {
+              useRoomStore.setState({
+                status: "closed",
+                roomEndReason: ended,
+                connectionStatus: "error",
+              });
               setConnectionError("");
               route("closed");
               return;
@@ -359,6 +374,28 @@ export default function Layout({ children }: LayoutProps) {
         });
     };
     socket.on("collaboration-changed", collaboration);
+    const editorSettings = (value: {
+      roomId: string;
+      editor: Partial<import("../../state/useSessionStore").SessionState>;
+      stage: string;
+      version: number;
+    }) => {
+      if (
+        !isCurrent() ||
+        value.roomId !== useRoomStore.getState().roomId ||
+        value.version <= latestVersion
+      )
+        return;
+      latestVersion = value.version;
+      setConnectionError("");
+      applying = true;
+      const current = useRoomStore.getState();
+      if (!current.isHost) useSessionStore.setState(value.editor);
+      useRoomStore.setState({ stage: value.stage });
+      applying = false;
+      if (current.stage !== value.stage) route(current.status, value.stage);
+    };
+    socket.on("editor-state-changed", editorSettings);
     const offline = () => setNetworkOnline(false);
     window.addEventListener("offline", offline);
     const resumeConnection = () => {
@@ -387,6 +424,7 @@ export default function Layout({ children }: LayoutProps) {
       clearTimeout(debounce);
       unsubscribe();
       socket.off("collaboration-changed", collaboration);
+      socket.off("editor-state-changed", editorSettings);
       window.removeEventListener("offline", offline);
       window.removeEventListener("online", resumeConnection);
       document.removeEventListener("visibilitychange", resumeConnection);

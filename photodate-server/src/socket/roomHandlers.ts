@@ -617,6 +617,12 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     const d = document(room.id);
     const incoming = editorDocument(p.editor);
     const editor = p.patch ? { ...d.editor, ...incoming } : incoming;
+    const settingsPatch = Object.fromEntries(
+      Object.entries(editor).filter(
+        ([key, value]) =>
+          JSON.stringify(d.editor[key]) !== JSON.stringify(value),
+      ),
+    );
     assert(
       JSON.stringify(editor).length <= 6000000,
       "Editor document too large",
@@ -655,7 +661,14 @@ export function registerRoomHandlers(io: Server, socket: Socket) {
     d.editor = editor;
     d.stage = stage;
     save(room.id, d);
-    changed(room.id);
+    if (orderChanged) changed(room.id);
+    else
+      io.to(room.id).emit("editor-state-changed", {
+        roomId: room.id,
+        editor: settingsPatch,
+        stage,
+        version: d.version,
+      });
   });
   bind("simulate-group", () => {
     throw new Fault(
