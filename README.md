@@ -2,6 +2,28 @@
 
 A shared photobooth for up to four participants using React, Vite, Express, Socket.IO and SQLite. Each device captures its own camera at server-scheduled deadlines. The editor combines real participant photos into shared group frames; live remote camera feeds are not streamed.
 
+## Studio features
+
+- Eight photostudio themes with coordinated colors, ambient animations, and themed QR invitation cards.
+- Portrait, landscape, square, and mixed photo layouts, plus custom layouts with movable, resizable, and tilted frames.
+- Eight ready-made keepsake templates for birthdays, graduation, couples, friends, and events, available on **Choose your strip**.
+- Camera selection for available built-in or external devices, with automatic, landscape, and portrait framing.
+- A live strip preview showing captured photos and upcoming frames throughout the countdown.
+- Single-shot retakes that preserve the other photos and require the crew to approve a new countdown.
+- Shared photo review with chat, favorites, order suggestions, and approval before continuing.
+- Per-frame zoom, crop, and positioning, followed by filters, captions, font styles, text layers, stickers, and drawing.
+- PNG/PDF keepsake export, with native file sharing when the device supports it.
+
+## A photo date, step by step
+
+1. Choose a studio theme, create a lobby, and share its code, link, or QR invitation with up to three guests.
+2. Pick a ready-made template or build your own layout, then choose the frame design.
+3. Each participant enables a camera and confirms readiness. The host starts the synchronized countdown.
+4. Review the shots together, retake an individual shot if needed, arrange the strip, and approve the result.
+5. Add filters and finishing touches, then save or share the keepsake before leaving.
+
+QR invitations use the current site's address. A `localhost` QR code opens only on the same computer; use the deployed HTTPS address when inviting phones or other devices.
+
 ## Local setup
 
 Use Node.js 24 LTS and npm. In the server directory:
@@ -47,6 +69,10 @@ Create/join issues a private session token held in sessionStorage. REST calls us
 Room codes accept lowercase and surrounding whitespace. Retrying a join with the existing room credential resumes the same membership without consuming a slot; new guests can join only before capture starts. Reserved places expire after the configured grace period if a device never connects. Restart recovery preserves credentials, gives previously connected members a reconnect window, and resets an interrupted capture to camera readiness instead of replaying old deadlines. These leases were added in schema version 2; schema version 3 adds transactional capture-storage counters.
 
 Photo bytes and editor data are stored in SQLite for the room lifetime. Browser persistence keeps compact preferences and identity, not the entire photo document. Image sizes/dimensions/types, frame counts, editor size, rooms, rates and storage are bounded. This targets small single-server deployments.
+
+Rooms are temporary. The default lifetime is 24 hours, and a host leaving closes the room for everyone. Save the keepsake before the session ends; an old invitation does not restore a removed room. Start a new lobby and share its new invitation for another session.
+
+Filter changes reuse photos already acknowledged by the server rather than uploading them again. Pending editor changes are grouped while an update is in flight, and reconnect handling prevents old timeout callbacks from replacing a recovered connection's state.
 
 ## Production
 
