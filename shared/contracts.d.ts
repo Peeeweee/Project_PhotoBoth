@@ -66,6 +66,7 @@ export interface RoomSnapshot<Editor extends object = Record<string, unknown>> {
   roundId: string | null;
   frameCount: number;
   retakeFrameIndex?: number | null;
+  closureReason?: "expired";
   messages: RoomMessage[];
   photoVotes: PhotoVote[];
   shotDeadlines: number[];

@@ -82,6 +82,7 @@ export interface Document {
   roundId: string | null;
   frameCount: number;
   retakeFrameIndex: number | null;
+  closureReason?: "expired";
   messages: RoomMessage[];
   photoVotes: PhotoVote[];
   reviewApprovals: string[];
@@ -245,6 +246,9 @@ export function cleanup(force = true) {
     .all(`-${RETENTION_HOURS} hours`) as { id: string; host_id: string }[];
   for (const room of expired) {
     // Notify and evict connected participants before cascading away the room.
+    const d = document(room.id);
+    d.closureReason = "expired";
+    save(room.id, d);
     removeParticipant(room.id, room.host_id);
     roomQueries.delete(room.id);
   }

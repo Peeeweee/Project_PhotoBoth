@@ -17,6 +17,7 @@ export interface RoomState {
   sessionToken: string | null;
   roundId: string | null;
   retakeFrameIndex: number | null;
+  roomEndReason: import("../lib/roomAvailability").RoomEndReason | null;
   cameraReady: boolean;
   connectionStatus:
     "disconnected" | "connecting" | "joining" | "joined" | "error";
@@ -73,6 +74,7 @@ const initialState: RoomState = {
   sessionToken: null,
   roundId: null,
   retakeFrameIndex: null,
+  roomEndReason: null,
   cameraReady: false,
   connectionStatus: "disconnected",
   captureResumeVersion: 0,

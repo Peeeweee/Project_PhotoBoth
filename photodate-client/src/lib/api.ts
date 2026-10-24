@@ -18,7 +18,7 @@ import { useRoomStore } from "../state/useRoomStore";
 import { normalizeRoomCode } from "./roomCode";
 const BASE = import.meta.env.VITE_SERVER_URL ?? "/api";
 
-class HttpError extends Error {
+export class HttpError extends Error {
   readonly status: number;
   readonly retryAfterMs: number;
   constructor(message: string, status: number, retryAfterMs: number) {
