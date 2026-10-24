@@ -1,6 +1,6 @@
 import type { PhotoEdit } from "../../../shared/contracts";
 export const DEFAULT_PHOTO_EDIT: PhotoEdit = {
-  fit: "contain",
+  fit: "cover",
   zoom: 1,
   x: 0,
   y: 0,

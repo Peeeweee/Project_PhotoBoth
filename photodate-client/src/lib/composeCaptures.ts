@@ -2,6 +2,7 @@ import { getLayout, slotAspectRatio } from "../data/stripLayouts";
 import { useSessionStore } from "../state/useSessionStore";
 import { useRoomStore } from "../state/useRoomStore";
 import type { GetCapturesResponse } from "./api";
+import { participantTiles, coverCrop } from "./photoComposition";
 export async function composeCaptures(
   captures: GetCapturesResponse["captures"],
 ) {
@@ -39,32 +40,33 @@ export async function composeCaptures(
         ),
       );
       const canvas = document.createElement("canvas");
-      const layout = getLayout(useSessionStore.getState().layoutId, useSessionStore.getState().customLayout);
+      const layout = getLayout(
+        useSessionStore.getState().layoutId,
+        useSessionStore.getState().customLayout,
+      );
       const ratio = slotAspectRatio(layout, frame);
       canvas.width = ratio >= 1 ? 1200 : Math.round(1200 * ratio);
       canvas.height = ratio >= 1 ? Math.round(1200 / ratio) : 1200;
       const ctx = canvas.getContext("2d")!;
-      ctx.fillStyle = "#111";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const columns = images.length > 2 ? 2 : images.length;
-      const rows = Math.ceil(images.length / columns);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      const tiles = participantTiles(
+        images.length,
+        ratio,
+        images.map((img) => img.width / img.height),
+      );
       images.forEach((img, i) => {
-        const w = canvas.width / columns,
-          h = canvas.height / rows;
-        const scale = Math.min(w / img.width, h / img.height);
-        const dw = img.width * scale,
-          dh = img.height * scale;
-        ctx.drawImage(
-          img,
-          (i % columns) * w + (w - dw) / 2,
-          Math.floor(i / columns) * h + (h - dh) / 2,
-          dw,
-          dh,
-        );
+        const tile = tiles[i];
+        const x = Math.round(tile.x * canvas.width),
+          y = Math.round(tile.y * canvas.height);
+        const w = Math.round((tile.x + tile.width) * canvas.width) - x;
+        const h = Math.round((tile.y + tile.height) * canvas.height) - y;
+        const crop = coverCrop(img.width, img.height, w / h);
+        ctx.drawImage(img, crop.x, crop.y, crop.width, crop.height, x, y, w, h);
       });
       return {
         id: `frame-${frame}`,
-        image_url: canvas.toDataURL("image/jpeg", 0.9),
+        image_url: canvas.toDataURL("image/jpeg", 0.92),
         frame_index: frame,
       };
     }),
