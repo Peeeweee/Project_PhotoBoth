@@ -1,4 +1,5 @@
 import RestartRoundDialog from "../components/capture/RestartRoundDialog";
+import { participantTiles } from "../lib/photoComposition";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { socket } from "../lib/socket";
 import { uploadCapture } from "../lib/api";
@@ -43,19 +44,32 @@ export default function CaptureRoom() {
   const [orientation, setOrientation] = useState<
     "auto" | "landscape" | "portrait"
   >("auto");
-  const columns = participants.length > 1 ? 2 : 1;
-  const rows = Math.ceil(Math.max(1, participants.length) / columns);
   const capturedKeys = useRef(new Set<string>());
   const [flashShot, setFlashShot] = useState(0);
   const [votePending, setVotePending] = useState(false);
+  const [approvalError, setApprovalError] = useState("");
+  useEffect(() => {
+    setApprovalError("");
+    setVotePending(false);
+  }, [approvedParticipantIds, roundId]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [index, setIndex] = useState(0);
   const customLayout = useSessionStore((s) => s.customLayout);
   const layout = getLayout(layoutId, customLayout);
-  const automaticAspect =
-    (slotAspectRatio(layout, Math.min(index, layout.slotCount - 1)) * rows) /
-    columns;
+  const slotAspect = slotAspectRatio(
+    layout,
+    Math.min(index, layout.slotCount - 1),
+  );
+  const tiles = participantTiles(Math.max(1, participants.length), slotAspect);
+  const selfIndex = Math.max(
+    0,
+    [...participants]
+      .sort((a, b) => a.slot_index - b.slot_index)
+      .findIndex((p) => p.id === selfId),
+  );
+  const tile = tiles[selfIndex] ?? tiles[0];
+  const automaticAspect = (slotAspect * tile.width) / tile.height;
   const cameraAspect =
     orientation === "landscape"
       ? 16 / 9
@@ -217,16 +231,26 @@ export default function CaptureRoom() {
   const vote = () => {
     if (!roomCode) return;
     setVotePending(true);
-    setError("");
+    setApprovalError("");
+    const desired = !approved;
     socket
-      .timeout(8000)
+      .timeout(15000)
       .emit(
         "capture-approval",
-        { code: roomCode, approved: !approved },
+        { code: roomCode, approved: desired },
         (timeout, ack) => {
           setVotePending(false);
-          if (timeout) setError("Approval timed out. Please try again.");
-          else if (!ack.ok) setError(ack.error.message);
+          if (
+            timeout &&
+            useRoomStore
+              .getState()
+              .approvedParticipantIds.includes(selfId ?? "") !== desired
+          )
+            setApprovalError(
+              "Approval wasn’t confirmed. Check your connection and try again.",
+            );
+          else if (!timeout && !ack.ok) setApprovalError(ack.error.message);
+          else setApprovalError("");
         },
       );
   };
@@ -571,9 +595,9 @@ export default function CaptureRoom() {
               <span>Pick your favorite order after the shots.</span>
             </div>
           </section>
-          {error && (
+          {(error || approvalError) && (
             <div className="studio-error" role="alert">
-              {error}
+              {error || approvalError}
               {pending.current.length > 0 && (
                 <button className="action-secondary" onClick={retry}>
                   Retry uploads

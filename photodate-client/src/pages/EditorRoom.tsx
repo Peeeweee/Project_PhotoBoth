@@ -74,6 +74,11 @@ export default function EditorRoom() {
     });
   };
   const [voteError, setVoteError] = useState("");
+  const [approvalPending, setApprovalPending] = useState(false);
+  useEffect(() => {
+    setVoteError("");
+    setApprovalPending(false);
+  }, [reviewRevision, reviewApprovals]);
   const [loadError, setLoadError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -87,14 +92,14 @@ export default function EditorRoom() {
         setCaptures(sorted);
         if (useRoomStore.getState().isHost) {
           const current = useSessionStore.getState();
-          const restored = current.assignedPhotos.map(
-            (photo, i) =>
-              photo ||
-              (current.photoSources[i] !== null &&
-              current.photoSources[i] !== undefined
-                ? (sorted.find((c) => c.frame_index === current.photoSources[i])
-                    ?.image_url ?? "")
-                : ""),
+          const restored = current.assignedPhotos.map((photo, i) =>
+            current.photoSources[i] !== null &&
+            current.photoSources[i] !== undefined
+              ? (sorted.find((c) => c.frame_index === current.photoSources[i])
+                  ?.image_url ??
+                photo ??
+                "")
+              : (photo ?? ""),
           );
           if (
             JSON.stringify(restored) !== JSON.stringify(current.assignedPhotos)
@@ -489,11 +494,14 @@ export default function EditorRoom() {
               !isComplete ||
               !orderSynced ||
               !reviewRevision ||
+              approvalPending ||
               connectionStatus !== "joined"
             }
             onClick={() => {
               if (!roomCode) return;
-              socket.timeout(8000).emit(
+              setVoteError("");
+              setApprovalPending(true);
+              socket.timeout(15000).emit(
                 "review-approval",
                 {
                   code: roomCode,
@@ -501,18 +509,24 @@ export default function EditorRoom() {
                   approved: !reviewApprovals.includes(selfId ?? ""),
                 },
                 (timeout, ack) => {
+                  setApprovalPending(false);
+                  if (useRoomStore.getState().reviewRevision !== reviewRevision)
+                    return;
                   if (timeout)
                     setVoteError(
                       "Approval not confirmed. Check your connection and try again.",
                     );
                   else if (!ack.ok) setVoteError(ack.error.message);
+                  else setVoteError("");
                 },
               );
             }}
           >
-            {reviewApprovals.includes(selfId ?? "") && orderSynced
-              ? "Change my approval"
-              : "I love this order"}
+            {approvalPending
+              ? "Confirming your approval…"
+              : reviewApprovals.includes(selfId ?? "") && orderSynced
+                ? "Change my approval"
+                : "I love this order"}
           </button>
           {!orderSynced && (
             <p className="studio-note" role="status">
