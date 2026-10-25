@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>PeeDate</title>
+  <desc>A rounded photo print forming a P, with a heart at its center and a tiny flash.</desc>
+  <defs>
+    <linearGradient id="peel" x1="8" y1="8" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB2C9"/><stop offset=".5" stop-color="#EF58AD"/><stop offset="1" stop-color="#9673EF"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="#21172D"/>
+  <path d="M17 52V19a8 8 0 0 1 8-8h13a15 15 0 0 1 0 30H27v11H17Z" fill="url(#peel)"/>
+  <rect x="23" y="17" width="24" height="18" rx="6" fill="#FFF5FC"/>
+  <path d="M35 31s-7-4.1-7-7.2a3.7 3.7 0 0 1 7-1.4 3.7 3.7 0 0 1 7 1.4C42 26.9 35 31 35 31Z" fill="#D94196"/>
+  <path d="m51 39 1.9 4.9L58 46l-5.1 2.1L51 53l-2-4.9L44 46l5-2.1L51 39Z" fill="#FFE3B4"/>
+  <path d="M23 40v5" stroke="#FFF5FC" stroke-width="2" stroke-linecap="round"/>
+</svg>
