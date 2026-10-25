@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Camera, Check, Copy, LogOut } from "lucide-react";
+import { Check, Copy, LogOut } from "lucide-react";
 import BackButton from "./BackButton";
 import { useRoomStore } from "../../state/useRoomStore";
 
@@ -26,12 +26,12 @@ export default function AppHeader({ onLeave }: { onLeave: () => void }) {
     <header className="app-topbar">
       <div className="app-topbar-inner">
         <div className="app-topbar-start">
-          <div className="app-wordmark" aria-label="PhotoDate studio">
+          <div className="app-wordmark" aria-label="PeeDate studio">
             <span className="app-brand-symbol">
-              <Camera size={20} strokeWidth={1.7} />
+              <img src="/peedate-logo.svg" width="36" height="36" alt="" />
             </span>
             <span>
-              PhotoDate<span className="app-brand-studio">STUDIO</span>
+              PeeDate<span className="app-brand-studio">STUDIO</span>
             </span>
           </div>
           <span className="app-header-divider" />
