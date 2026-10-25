@@ -71,7 +71,7 @@ export default function QrInvite({ code }: { code: string }) {
                 src={image}
                 width={192}
                 height={192}
-                alt={`Scan to join PhotoDate room ${code}`}
+                alt={`Scan to join PeeDate room ${code}`}
               />
             ) : (
               <p role="status">{error || "Creating invitation…"}</p>

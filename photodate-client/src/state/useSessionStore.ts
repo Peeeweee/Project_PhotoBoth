@@ -108,7 +108,7 @@ export interface SessionState {
    * When enabled, maxParticipants → 4 and layoutId defaults to '2x2'.
    */
   isGroupMode: boolean;
-  /** Whether to show the PhotoDate watermark on the strip */
+  /** Whether to show the PeeDate watermark on the strip */
   showWatermark: boolean;
 }
 

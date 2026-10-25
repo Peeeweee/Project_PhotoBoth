@@ -62,7 +62,7 @@ export default function ExportRoom() {
     try {
       await navigator.share({
         files: [lastExport.file],
-        title: stripTitle || "PhotoDate",
+        title: stripTitle || "PeeDate",
       });
     } catch (error) {
       if (!(error instanceof Error && error.name === "AbortError"))
@@ -109,7 +109,7 @@ export default function ExportRoom() {
       }
 
       const link = document.createElement("a");
-      link.download = `${stripTitle || "photodate"}.${format}`;
+      link.download = `${stripTitle || "peedate"}.${format}`;
       link.href = dataUrl;
       rememberExport(dataUrl, link.download, format);
       link.click();
@@ -161,7 +161,7 @@ export default function ExportRoom() {
         undefined,
         "FAST",
       );
-      const filename = `${stripTitle || "photodate"}.pdf`;
+      const filename = `${stripTitle || "peedate"}.pdf`;
       rememberExport(pdf.output("datauristring"), filename, "pdf");
       pdf.save(filename);
     } catch (e) {
@@ -247,7 +247,7 @@ export default function ExportRoom() {
             margin: "0 0 var(--sp-1)",
           }}
         >
-          Your PhotoDate
+          Your PeeDate
         </h1>
         <p
           style={{

@@ -412,7 +412,7 @@ export const StripCanvas = forwardRef<HTMLDivElement, StripCanvasProps>(
               >
                 {showWatermark && (
                   <span style={{ fontWeight: 700, letterSpacing: "0.05em" }}>
-                    PhotoDate
+                    PeeDate
                   </span>
                 )}
                 <span

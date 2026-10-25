@@ -121,7 +121,7 @@ export default function DoneRoom() {
             margin: 0,
           }}
         >
-          Your PhotoDate is complete.
+          Your PeeDate is complete.
         </p>
       </div>
 

@@ -73,7 +73,7 @@ export default function ThemeCard({
               </svg>
             </div>
           ))}
-          <span className="style-print-caption">PhotoDate ♡</span>
+          <span className="style-print-caption">PeeDate ♡</span>
         </div>
         <span className="style-preview-label">Illustrated sample</span>
         {selected && <span className="style-selected-check">✓</span>}

@@ -360,7 +360,7 @@ export default function CustomLayoutEditor() {
                 </div>
               ))}
               <span className="maker-paper-caption">
-                PhotoDate <small>A LITTLE MOMENT, FOREVER.</small>
+                PeeDate <small>A LITTLE MOMENT, FOREVER.</small>
               </span>
             </div>
             <p className="maker-canvas-hint">

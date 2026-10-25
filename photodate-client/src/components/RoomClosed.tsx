@@ -94,7 +94,7 @@ export default function RoomClosed() {
                 const link = document.createElement("a");
                 setSavedUrl(url);
                 link.href = url;
-                link.download = "photodate.png";
+                link.download = "peedate.png";
                 link.click();
               } catch (e) {
                 setError(
@@ -123,7 +123,7 @@ export default function RoomClosed() {
         <a
           className="studio-text-button"
           href={savedUrl}
-          download="photodate.png"
+          download="peedate.png"
         >
           Download your prepared strip
         </a>
