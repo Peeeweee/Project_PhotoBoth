@@ -147,5 +147,5 @@ if (require.main === module)
   httpServer.listen(
     Number(process.env.PORT) || 3001,
     process.env.HOST ?? "0.0.0.0",
-    () => console.log("PhotoDate server listening"),
+    () => console.log("PeeDate server listening"),
   );

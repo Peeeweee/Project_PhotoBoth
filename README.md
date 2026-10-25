@@ -1,4 +1,4 @@
-# PhotoDate photobooth
+# PeeDate photobooth
 
 A shared photobooth for up to four participants using React, Vite, Express, Socket.IO and SQLite. Each device captures its own camera at server-scheduled deadlines. The editor combines real participant photos into shared group frames; live remote camera feeds are not streamed.
 
