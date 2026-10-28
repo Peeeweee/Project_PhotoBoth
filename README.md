@@ -1,6 +1,16 @@
 # PeeDate photobooth
 
+<img src="photodate-client/public/peedate-logo.svg" alt="PeeDate logo: a photo-print P with a heart and flash" width="88" height="88" />
+
 A shared photobooth for up to four participants using React, Vite, Express, Socket.IO and SQLite. Each device captures its own camera at server-scheduled deadlines. The editor combines real participant photos into shared group frames; live remote camera feeds are not streamed.
+
+## Recent improvements
+
+- **PeeDate identity:** an original photo-print P logo, matching browser-tab icon, and updated app and keepsake branding.
+- **Full-frame photos:** group composition chooses an arrangement suited to the frame and source photos. Center cropping fills each area without black bars; use the photo adjustment controls to refine positioning.
+- **Better capture quality:** high-quality image smoothing and higher JPEG quality during capture and group composition.
+- **Lighter collaboration:** filter and decoration changes broadcast compact settings updates instead of repeatedly sending the full photo document. Approval feedback shows pending requests and clears recovered errors.
+- **Clear room endings:** themed cards explain expired, closed, missing, and ended memberships, with actions to create a new lobby or try another code. Photos still available in the current tab can be saved before starting over.
 
 ## Studio features
 
@@ -12,7 +22,7 @@ A shared photobooth for up to four participants using React, Vite, Express, Sock
 - Single-shot retakes that preserve the other photos and require the crew to approve a new countdown.
 - Shared photo review with chat, favorites, order suggestions, and approval before continuing.
 - Per-frame zoom, crop, and positioning, followed by filters, captions, font styles, text layers, stickers, and drawing.
-- PNG/PDF keepsake export, with native file sharing when the device supports it.
+- PNG, JPEG, and PDF keepsake export, with native file sharing when the device supports it.
 
 ## A photo date, step by step
 
@@ -46,6 +56,19 @@ Open http://localhost:5173. Vite forwards /api and /socket.io to the backend on 
 Create a room and open its invitation in another browser or separate tab. Each participant enables their own camera. The host selects layout/design, waits for all cameras, then starts. Upload retries retain their participant/round/frame identity. Review begins when all expected uploads finish. The host edits; guests view the shared result and can export their own copy.
 
 Mobile camera testing needs HTTPS with a trusted certificate or tunnel; plain HTTP LAN addresses generally cannot use cameras. To expose the Vite server on your LAN, run `node node_modules/vite/bin/vite.js --host` from the client directory. Development servers are for local testing.
+
+## Troubleshooting a session
+
+| Situation | What to do |
+| --- | --- |
+| An invitation is expired or its room has closed | Choose **Create a new lobby** and share the new invitation. Closed or removed rooms cannot be reopened with their old codes. |
+| The lobby is full | Wait for a spot, try joining again, or create another lobby. Each room supports four participants total, including the host. |
+| A photo needs a different crop | In review, choose **Adjust** to fill the frame, keep the whole photo, zoom, or reposition it. Filling a frame can crop the image edges. |
+| Approval is still pending | Keep the tab connected and wait for confirmation. If the order changes, review it and approve the new version. |
+| The connection drops | Keep the tab open and reconnect within the configured grace period. A refreshed page may need to download the room's saved editor state again. |
+| Leaving cannot be confirmed | Retry when connected, or choose **Leave on this device**. That fallback disconnects locally; the reason may not reach the crew. |
+
+The PeeDate name does not change existing session storage keys, database filenames, or package directory names. Those retain their original `photodate` identifiers for compatibility.
 
 ## Checks
 
